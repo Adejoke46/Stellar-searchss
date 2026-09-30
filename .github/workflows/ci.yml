@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
 # Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
@@ -11,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build (Node ${{ matrix.node-version }})
+  test:
+    name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -32,10 +33,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
+      - name: Type check
         run: npx tsc --noEmit
 
       - name: Build
         run: npm run build
 
-      # Tests: add a step here (e.g. `npm test`) once a test framework lands.
+      - name: Parity test (Express vs serverless)
+        run: npx tsx --test tests/parity.test.ts
