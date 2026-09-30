@@ -20,6 +20,7 @@ This document covers everything you need to go from zero to a merged pull reques
 10. [Testing](#testing)
 11. [Common Pitfalls](#common-pitfalls)
 12. [Getting Help](#getting-help)
+13. [Changelog & Releases](#changelog--releases)
 
 ---
 
@@ -459,6 +460,41 @@ npm run test:search "Stellar blockchain"
 | Account not found | Account not funded on testnet | Fund it at Stellar Lab |
 | USDC balance always 0 | Wrong USDC issuer address | Use `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` for testnet |
 | Transactions not loading | Horizon rate-limit | Add a 500ms delay between calls; use pagination |
+
+---
+
+## Changelog & Releases
+
+Every notable change to StellarSearch is recorded in [`CHANGELOG.md`](./CHANGELOG.md), which follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+### When to update the changelog
+
+If your PR changes behaviour that a deployer or user would care about, add an entry under the `## [Unreleased]` section of `CHANGELOG.md` in the same PR. Use the appropriate subsection:
+
+| Subsection | Use for |
+|---|---|
+| `Added` | New features, new env vars, new endpoints |
+| `Changed` | Behaviour changes to existing features |
+| `Deprecated` | Features that will be removed in a future release |
+| `Removed` | Features removed in this release |
+| `Fixed` | Bug fixes |
+| `Security` | Vulnerability fixes |
+
+Docs-only, test-only, and internal refactor PRs do not require a changelog entry.
+
+### Release process
+
+Maintainers cut releases as follows:
+
+1. Move entries from `## [Unreleased]` into a new `## [x.y.z] - YYYY-MM-DD` section.
+2. Update the comparison links at the bottom of `CHANGELOG.md`.
+3. Bump the version in `package.json` to match.
+4. Tag the commit (`git tag vX.Y.Z`) and push the tag.
+5. Publish the GitHub Release using the new changelog section as the release notes.
+
+### Automating from conventional commits
+
+Because all commits follow [Conventional Commits](#commit-messages), the changelog can be generated automatically. A future PR will wire up a tool such as [`git-cliff`](https://git-cliff.org) or [`conventional-changelog`](https://github.com/conventional-changelog/conventional-changelog) to produce entries from commit history. Until then, update `CHANGELOG.md` by hand — the commit types (`feat`, `fix`, `docs`, etc.) map directly onto the changelog subsections above.
 
 ---
 
