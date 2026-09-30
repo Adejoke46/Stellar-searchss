@@ -22,6 +22,7 @@ import { paymentMiddlewareFromConfig } from '@x402/express'
 import { ExactStellarScheme } from '@x402/stellar/exact/server'
 import { HTTPFacilitatorClient } from '@x402/core/server'
 import logger from './logger'
+import { parseHealthResponse, type HealthResponse } from '../src/types'
 import {
   STELLAR_NETWORK,
   HORIZON_URL, 
@@ -479,6 +480,10 @@ app.post('/ai/chat', async (req: Request, res: Response) => {
 
 // ─── GET /health ──────────────────────────────────────────────────────────
 app.get('/health', (_req: Request, res: Response) => {
+  res.json(createHealthResponse())
+})
+
+export function createHealthResponse(): HealthResponse {
   const avg = stats.latencies.length
     ? Math.round(stats.latencies.reduce((a, b) => a + b, 0) / stats.latencies.length)
     : 0
@@ -486,7 +491,7 @@ app.get('/health', (_req: Request, res: Response) => {
   const up = Math.floor((Date.now() - stats.startTime) / 1000)
   const uptime = up < 60 ? `${up}s` : up < 3600 ? `${Math.floor(up / 60)}m` : `${Math.floor(up / 3600)}h`
 
-  res.json({
+  return parseHealthResponse({
     status:                    'ok',
     network:                   NETWORK,
     pricePerQuery:             '0.001 USDC',
@@ -500,7 +505,7 @@ app.get('/health', (_req: Request, res: Response) => {
     groqApiConfigured:         !!GROQ_API_KEY,
     receivingAddressConfigured: !!RECEIVING_ADDRESS,
   })
-})
+}
 
 // ─── GET / ────────────────────────────────────────────────────────────────
 app.get('/', (_req: Request, res: Response) => {
@@ -519,7 +524,7 @@ app.get('/', (_req: Request, res: Response) => {
 })
 
 // ─── Start ────────────────────────────────────────────────────────────────
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`\n🚀 StellarSearch on http://localhost:${PORT}`)
     console.log(`   Network:     ${NETWORK}`)
