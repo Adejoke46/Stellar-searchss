@@ -93,6 +93,12 @@ Browser (Freighter) → GET /search?q=...
 5. OpenZeppelin facilitator at `channels.openzeppelin.com/x402/testnet` verifies the signature and settles 0.001 USDC on Stellar testnet
 6. Server receives confirmation and returns search results
 
+> **Security:** payment *is* authentication in this project — there are no accounts, sessions, or API
+> keys, so the security of the payment flow is the security of the product. The trust boundaries
+> between client, server, facilitator, and the Stellar network are documented in the
+> **[payment flow threat model](docs/threat-model.md)**, which also enumerates the known attacks and
+> mitigations. See [`SECURITY.md`](SECURITY.md) for the security policy and reporting process.
+
 ---
 
 ## Project structure
@@ -121,8 +127,11 @@ stellar-search/
 │   └── index.ts                # MCP tools: web_search, ai_summarize, check_balance
 ├── scripts/
 │   └── test-search.ts          # End-to-end test script
+├── docs/
+│   └── threat-model.md         # Payment flow trust boundaries and attack analysis
 ├── .env.example
 ├── claude_mcp.json
+├── SECURITY.md
 └── README.md
 ```
 
