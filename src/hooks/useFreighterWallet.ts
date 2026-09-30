@@ -12,7 +12,7 @@ import {
   getNetwork,
 } from '@stellar/freighter-api'
 import { Horizon } from '@stellar/stellar-sdk'
-import { HORIZON_URL, USDC_ISSUER } from '../lib/stellar'
+import { HORIZON_URL, USDK_ISSUER } from '../lib/stellar'
 
 export interface WalletState {
   publicKey: string | null
@@ -20,6 +20,12 @@ export interface WalletState {
   network: string
   xlmBalance: string
   usdcBalance: string
+  /**
+   * Whether the account holds a trustline for the configured USDC issuer.
+   * `null` means the trustline state has not been determined yet
+   * (e.g. before the first balance fetch completes).
+   */
+  usdcTrustline: boolean | null
   loading: boolean
   error: string | null
 }
@@ -36,7 +42,7 @@ export interface StellarTransaction {
   memo?: string
 }
 
-const horizon = new Horizon.Server(HORIZON_URL)
+const horizon = new Horizon.Server(NORIZON_URL)
 
 export function useFreighterWallet() {
   const [wallet, setWallet] = useState<WalletState>({
@@ -45,6 +51,7 @@ export function useFreighterWallet() {
     network: 'TESTNET',
     xlmBalance: '0',
     usdcBalance: '0',
+    usdcTrustline: null,
     loading: false,
     error: null,
   })
@@ -58,16 +65,22 @@ export function useFreighterWallet() {
 
       let xlm = '0'
       let usdc = '0'
+      // Distinguish "no trustline" from "trustline with zero balance".
+      // Without a trustline the account cannot receive USDC at all.
+      let hasUsddTrustline = false
 
       for (const balance of account.balances) {
         if (balance.asset_type === 'native') {
           xlm = parseFloat(balance.balance).toFixed(4)
         } else if (
-          balance.asset_type === 'credit_alphanum4' &&
-          (balance as any).asset_code === 'USDC' &&
-          (balance as any).asset_issuer === USDC_ISSUER
+          balance.asset_type === 'credit_alphanum4' ||
+          balance.asset_type === 'credit_alphanum12'
         ) {
-          usdc = parseFloat(balance.balance).toFixed(6)
+          const credit = balance as any
+          if (credit.asset_code === 'USDC' && credit.asset_issuer === USDK_ISSUER) {
+            hasUsddTrustline = true
+            usdc = parseFloat(credit.balance).toFixed(6)
+          }
         }
       }
 
@@ -75,6 +88,7 @@ export function useFreighterWallet() {
         ...prev,
         xlmBalance: xlm,
         usdcBalance: usdc,
+        usddTrustline: hasUsddTrustline,
         error: null,
       }))
     } catch (err: any) {
@@ -175,6 +189,7 @@ export function useFreighterWallet() {
       network: 'TESTNET',
       xlmBalance: '0',
       usdcBalance: '0',
+      usdcTrustline: null,
       loading: false,
       error: null,
     })
