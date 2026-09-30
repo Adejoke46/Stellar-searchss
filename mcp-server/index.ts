@@ -12,9 +12,11 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import Groq from 'groq-sdk'
 import dotenv from 'dotenv'
+import http from 'node:http'
 import { 
   HORIZON_URL, 
   USDC_ISSUER, 
@@ -27,6 +29,11 @@ dotenv.config()
 
 const SERVER_URL = process.env.SEARCH_API_URL || 'http://localhost:3001'
 const GROQ_API_KEY = process.env.GROQ_API_KEY!
+
+const TRANSPORT = (process.env.MCP_TRANSPORT || 'stdio').toLowerCase()
+const HTTP_PORT = parseInt(process.env.MCP_HTTP_PORT || '3002', 10)
+const HTTP_HOST = process.env.MCP_HTTP_HOST || '0.0.0.0'
+const HTTP_AUTH_TOKEN = process.env.MCP_HTTP_AUTH_TOKEN
 
 const groq = new Groq({ apiKey: GROQ_API_KEY })
 
@@ -331,6 +338,67 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true }
 })
 
-const transport = new StdioServerTransport()
-await server.connect(transport)
-console.error('StellarSearch MCP server started')
+// ─── Transport selection ──────────────────────────────────────────────────
+if (TRANSPORT === 'http' || TRANSPORT === 'sse') {
+  // HTTP + SSE transport for hosted deployments.
+  // Clients connect via GET /sse (event stream) and POST /messages (JSON-RPC).
+  // Optional bearer-token auth via MCP_HTTP_AUTH_TOKEN.
+  const sessions = new Map<string, SSEServerTransport>()
+
+  const checkAuth = (req: http.IncomingMessage): boolean => {
+    if (!HTTP_AUTH_TOKEN) return true
+    const header = req.headers['authorization'] || ''
+    const token = Array.isArray(header) ? header[0] : header
+    return token === `Bearer ${HTTP_AUTH_TOKEN}`
+  }
+
+  const httpServer = http.createServer(async (req, res) => {
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+
+    if (!checkAuth(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Unauthorized' }))
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/sse') {
+      const transport = new SSEServerTransport('/messages', res)
+      sessions.set(transport.sessionId, transport)
+      res.on('close', () => sessions.delete(transport.sessionId))
+      await server.connect(transport)
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/messages') {
+      const sessionId = url.searchParams.get('sessionId') || ''
+      const transport = sessions.get(sessionId)
+      if (!transport) {
+        res.writeHead(404, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Session not found' }))
+        return
+      }
+      await transport.handlePostMessage(req, res)
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ status: 'ok', transport: 'http', sessions: sessions.size }))
+      return
+    }
+
+    res.writeHead(404, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Not found' }))
+  })
+
+  httpServer.listen(HTTP_PORT, HTTP_HOST, () => {
+    console.error(`StellarSearch MCP server started (HTTP+SSE) on http://${HTTP_HOST}:${HTTP_PORT}`)
+    console.error(`  SSE endpoint:      GET  /sse`)
+    console.error(`  Messages endpoint: POST /messages?sessionId=<id>`)
+    console.error(`  Auth:              ${HTTP_AUTH_TOKEN ? 'bearer token required' : 'disabled'}`)
+  })
+} else {
+  const transport = new StdioServerTransport()
+  await server.connect(transport)
+  console.error('StellarSearch MCP server started (stdio)')
+}
