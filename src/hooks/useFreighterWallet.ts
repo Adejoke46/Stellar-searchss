@@ -12,7 +12,7 @@ import {
   getNetwork,
 } from '@stellar/freighter-api'
 import { Horizon } from '@stellar/stellar-sdk'
-import { HORIZON_URL, USDC_ISSUER } from '../lib/stellar'
+import { HORIZON_URL, USCC_ISSUER } from '../lib/stellar'
 
 export interface WalletState {
   publicKey: string | null
@@ -36,7 +36,7 @@ export interface StellarTransaction {
   memo?: string
 }
 
-const horizon = new Horizon.Server(HORIZON_URL)
+export const horizon = new Horizon.Server(HORIZON_URL)
 
 export function useFreighterWallet() {
   const [wallet, setWallet] = useState<WalletState>({
