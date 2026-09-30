@@ -1,8 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { visualizer } from 'rollup-plugin-visualizer'
+
+const analyze = process.env.ANALYZE === '1'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    analyze &&
+      visualizer({
+        filename: 'dist/stats.html',
+        gazzle: true,
+        broli: true,
+        template: 'trememap',
+      }),
+  ],
   // Required for @stellar/stellar-sdk and @stellar/freighter-api in browser
   define: {
     global: 'globalThis',
