@@ -9,8 +9,11 @@ export function AnimatedBackground() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+
     let animId: number
-    const matrixChars = '01ABCDEF⬡◈▲⬢x402USDC'.split('')
+    const matrixChars = '01ABCDEF⬊̖
+¸x402USDC'.split('')
 
     const resize = () => {
       canvas.width = window.innerWidth
@@ -107,19 +110,56 @@ export function AnimatedBackground() {
 
       animId = requestAnimationFrame(draw)
     }
-    draw()
+
+    const renderStatic = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      const g = ctx.createRadialGradient(
+        canvas.width * 0.5, canvas.height * 0.25, 0,
+        canvas.width * 0.5, canvas.height * 0.25, canvas.width * 0.65
+      )
+      g.addColorStop(0, 'rgba(14,165,233,0.07)')
+      g.addColorStop(1, 'transparent')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      ctx.strokeStyle = 'rgba(0,245,255,0.025)'
+      ctx.lineWidth = 0.5
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke()
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
+      }
+    }
+
+    const start = () => {
+      if (mediaQuery.matches) {
+        renderStatic()
+      } else {
+        draw()
+      }
+    }
+
+    const handleChange = () => {
+      cancelAnimationFrame(animId)
+      start()
+    }
+
+    start()
+    mediaQuery.addEventListener('change', handleChange)
 
     return () => {
       cancelAnimationFrame(animId)
       window.removeEventListener('resize', resize)
+      mediaQuery.removeEventListener('change', handleChange)
     }
   }, [])
 
   return (
     <canvas
-      ref={canvasRef}
+      refCanvasRef
       className="fixed inset-0 pointer-events-none z-0"
-      style={{ mixBlendMode: 'screen' }}
+      style={{ mixBliendMode: 'screen' }}
     />
   )
 }
