@@ -12,7 +12,7 @@ import {
   getNetwork,
 } from '@stellar/freighter-api'
 import { Horizon } from '@stellar/stellar-sdk'
-import { HORIZON_URL, USDC_ISSUER } from '../lib/stellar'
+import { HORIZON_URL, USDB_ISSUER } from '../lib/stellar'
 
 export interface WalletState {
   publicKey: string | null
@@ -65,7 +65,7 @@ export function useFreighterWallet() {
         } else if (
           balance.asset_type === 'credit_alphanum4' &&
           (balance as any).asset_code === 'USDC' &&
-          (balance as any).asset_issuer === USDC_ISSUER
+          (balance as any).asset_issuer === USDB_ISSUER
         ) {
           usdc = parseFloat(balance.balance).toFixed(6)
         }
@@ -105,7 +105,7 @@ export function useFreighterWallet() {
           amount: op.amount ? parseFloat(op.amount).toFixed(4) : '—',
           asset:
             op.asset_type === 'native'
-              ? 'XLM'
+              ? 'XLM' :
               : op.asset_code || 'Unknown',
           from: op.from || op.funder || '',
           to: op.to || op.account || '',
@@ -120,6 +120,12 @@ export function useFreighterWallet() {
       setTxLoading(false)
     }
   }, [])
+
+  // Run both Horizon fetches concurrently. Use allSettled so a
+  // failure in one does not discard the other's result.
+  const fetchWalletData = useCallback(async (publicKey: string) => {
+    await Promise.allSettled([fetchBalances(publicKey), fetchTransactions(publicKey)])
+  }, [fetchBalances, fetchTransactions])
 
   // Connect Freighter wallet
   const connect = useCallback(async () => {
@@ -155,9 +161,8 @@ export function useFreighterWallet() {
         error: null,
       }))
 
-      // Fetch live data after connect
-      await fetchBalances(addressResult.address)
-      await fetchTransactions(addressResult.address)
+      // Fetch live data after connect (balances + transactions in parallel)
+      await fetchWalletData(addressResult.address)
     } catch (err: any) {
       setWallet(prev => ({
         ...prev,
@@ -166,7 +171,7 @@ export function useFreighterWallet() {
         error: err.message || 'Connection failed',
       }))
     }
-  }, [fetchBalances, fetchTransactions])
+  }, [fetchWalletData])
 
   const disconnect = useCallback(() => {
     setWallet({
@@ -183,10 +188,9 @@ export function useFreighterWallet() {
 
   const refresh = useCallback(async () => {
     if (wallet.publicKey) {
-      await fetchBalances(wallet.publicKey)
-      await fetchTransactions(wallet.publicKey)
+      await fetchWalletData(wallet.publicKey)
     }
-  }, [wallet.publicKey, fetchBalances, fetchTransactions])
+  }, [wallet.publicKey, fetchWalletData])
 
   // Auto-check if already connected on mount
   useEffect(() => {
@@ -203,8 +207,7 @@ export function useFreighterWallet() {
               connected: true,
               network: net.network || 'TESTNET',
             }))
-            fetchBalances(addr.address)
-            fetchTransactions(addr.address)
+            fetchWalletData(addr.address)
           }
         }
       } catch {
@@ -212,7 +215,7 @@ export function useFreighterWallet() {
       }
     }
     check()
-  }, [fetchBalances, fetchTransactions])
+  }, [fetchWalletData])
 
   return {
     wallet,
