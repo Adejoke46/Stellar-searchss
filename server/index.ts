@@ -16,6 +16,7 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import helmet from 'helmet'
 import { buildCorsOptions, getCorsStartupMessage } from './corsConfig.js'
 import Groq from 'groq-sdk'
 import { paymentMiddlewareFromConfig } from '@x402/express'
@@ -59,6 +60,52 @@ const groq = new Groq({ apiKey: GROQ_API_KEY })
 // ─── Middleware ───────────────────────────────────────────────────────────
 app.use(cors(buildCorsOptions()))
 app.use(express.json())
+
+// ─── Content Security Policy ─────────────────────────────────────────────
+// Origins the app actually needs:
+//   - 'self'                 — the app bundle and its own API
+//   - Horizon (STELLAR_NETWORK dependent) — Stellar RPC/Horizon calls
+//   - Serper image CDNs      — remote thumbnails/full images from image search
+//   - Groq API               — AI chat (server-side only, but kept for safety)
+// Inline styles are disallowed; the design must move styles into stylesheets.
+const CSP_DIRECTIVES = {
+  defaultSrc:     ["'self'"],
+  scriptSrc:      ["'self'"],
+  styleSrc:       ["'self'"],
+  imgSrc:         [
+    "'self'",
+    'data:',
+    'https://*.serper.dev',
+    'https://*.googleusercontent.com',
+    'https://*.gstatic.com',
+    'https://*.ggpht.com',
+  ],
+  connectSrc:     [
+    "'self'",
+    HORIZON_URL,
+    'https://*.serper.dev',
+    'https://api.groq.com',
+  ],
+  fontSrc:        ["'self'", 'data:'],
+  objectSrc:      ["'none'"],
+  baseUri:        ["'self'"],
+  frameAncestors: ["'none'"],
+  formAction:     ["'self'"],
+  upgradeInsecureRequests: [],
+}
+
+// Start in report-only mode; flip to enforce via CSP_ENFORCE=1 once the
+// violation reports are clean.
+const cspEnforced = process.env.CSP_ENFORCE === '1'
+app.use(
+  helmet({
+    contentSecurityPolicy: cspEnforced
+      ? { useDefaults: false, directives: CSP_DIRECTIVES }
+      : { useDefaults: false, directives: CSP_DIRECTIVES, reportOnly: true },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+)
 
 // ─── x402 payment guard on /search ───────────────────────────────────────
 // paymentMiddlewareFromConfig is the recommended API per official Stellar docs.
