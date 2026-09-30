@@ -38,6 +38,51 @@ export interface StellarTransaction {
 
 const horizon = new Horizon.Server(HORIZON_URL)
 
+const MAX_RETRIES = 4
+const BASE_DELAY_MS = 1000
+const BALANCE_CACHE_TTL_MS = 5000
+
+const balanceCache = new Map<string, { xlm: string; usdc: string; ts: number }>()
+
+function isRateLimitError(err: any): boolean {
+  if (!err) return false
+  if (err.response?.status === 429) return true
+  if (err.status === 429) return true
+  return false
+}
+
+function getRetryAfterMs(err: any): number | null {
+  const headers = err?.response?.headers
+  if (!headers) return null
+  const raw =
+    typeof headers.get === 'function'
+      ? headers.get('retry-after')
+      : headers['retry-after']
+  if (!raw) return null
+  const seconds = parseInt(raw, 10)
+  if (Number.isNaN(seconds)) return null
+  return seconds * 1000
+}
+
+async function withBackoff<T>(fn: () => Promise<T>): Promise<T> {
+  let attempt = 0
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      return await fn()
+    } catch (err: any) {
+      if (!isRateLimitError(err) || attempt >= MAX_RETRIES) {
+        throw err
+      }
+      const retryAfter = getRetryAfterMs(err)
+      const delay =
+        retryAfter ?? BASE_DELAY_MS * Math.pow(2, attempt)
+      await new Promise(resolve => setTimeout(resolve, delay))
+      attempt += 1
+    }
+  }
+}
+
 export function useFreighterWallet() {
   const [wallet, setWallet] = useState<WalletState>({
     publicKey: null,
@@ -54,7 +99,12 @@ export function useFreighterWallet() {
   // Fetch real balances from Horizon
   const fetchBalances = useCallback(async (publicKey: string) => {
     try {
-      const account = await horizon.loadAccount(publicKey)
+      const cached = balanceCache.get(publicKey)
+      if (cached && Date.now() - cached.ts < BALANCE_CACHE_TTL_MS) {
+        return
+      }
+
+      const account = await withBackoff(() => horizon.loadAccount(publicKey))
 
       let xlm = '0'
       let usdc = '0'
@@ -71,6 +121,8 @@ export function useFreighterWallet() {
         }
       }
 
+      balanceCache.set(publicKey, { xlm, usdc, ts: Date.now() })
+
       setWallet(prev => ({
         ...prev,
         xlmBalance: xlm,
@@ -78,6 +130,13 @@ export function useFreighterWallet() {
         error: null,
       }))
     } catch (err: any) {
+      if (isRateLimitError(err)) {
+        setWallet(prev => ({
+          ...prev,
+          error: 'Rate limited, retrying…',
+        }))
+        return
+      }
       setWallet(prev => ({
         ...prev,
         error: err.message || 'Failed to load account',
@@ -89,12 +148,14 @@ export function useFreighterWallet() {
   const fetchTransactions = useCallback(async (publicKey: string) => {
     setTxLoading(true)
     try {
-      const ops = await horizon
-        .operations()
-        .forAccount(publicKey)
-        .order('desc')
-        .limit(15)
-        .call()
+      const ops = await withBackoff(() =>
+        horizon
+          .operations()
+          .forAccount(publicKey)
+          .order('desc')
+          .limit(15)
+          .call()
+      )
 
       const txs: StellarTransaction[] = ops.records
         .filter((op: any) => op.type === 'payment' || op.type === 'create_account')
@@ -114,8 +175,10 @@ export function useFreighterWallet() {
         }))
 
       setTransactions(txs)
-    } catch (_) {
-      setTransactions([])
+    } catch (err: any) {
+      if (!isRateLimitError(err)) {
+        setTransactions([])
+      }
     } finally {
       setTxLoading(false)
     }
