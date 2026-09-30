@@ -447,9 +447,15 @@ app.post('/ai/chat', async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`)
   }
 
-  // Abort the Groq stream if the client disconnects mid-response.
+  // Abort the Groq stream if the client disconnects mid-response. The
+  // request's 'close' event fires as soon as its body is consumed, so
+  // disconnects are detected on the response instead: ServerResponse emits
+  // 'close' with writableEnded === false only when the client went away
+  // before the response completed.
   const controller = new AbortController()
-  req.on('close', () => controller.abort())
+  res.on('close', () => {
+    if (!res.writableEnded) controller.abort()
+  })
 
   try {
     const stream = await groq.chat.completions.create(
