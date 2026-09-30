@@ -22,6 +22,7 @@ import { paymentMiddlewareFromConfig } from '@x402/express'
 import { ExactStellarScheme } from '@x402/stellar/exact/server'
 import { HTTPFacilitatorClient } from '@x402/core/server'
 import logger from './logger'
+import { warnOnMissingFields } from './serperSchema'
 import {
   STELLAR_NETWORK,
   HORIZON_URL, 
@@ -182,6 +183,7 @@ app.get('/search', async (req: Request, res: Response) => {
     }
 
     const data = await serperRes.json()
+    warnOnMissingFields('search', data, ['organic'])
     const latencyMs = Date.now() - t0
 
     stats.totalQueries++
@@ -189,6 +191,7 @@ app.get('/search', async (req: Request, res: Response) => {
     stats.latencies.push(latencyMs)
     if (stats.latencies.length > 200) stats.latencies.shift()
 
+    warnOnMissingFields('search.organic', data.organic, ['title', 'link', 'snippet'])
     const results = (data.organic || []).map((r: any, i: number) => ({
       id: String(i + 1),
       title: r.title || 'No title',
@@ -277,6 +280,7 @@ app.get('/images', async (req: Request, res: Response) => {
     }
 
     const data = await serperRes.json()
+    warnOnMissingFields('images', data, ['images'])
     const latencyMs = Date.now() - t0
 
     stats.totalQueries++
@@ -284,6 +288,7 @@ app.get('/images', async (req: Request, res: Response) => {
     stats.latencies.push(latencyMs)
     if (stats.latencies.length > 200) stats.latencies.shift()
 
+    warnOnMissingFields('images.images', data.images, ['title', 'imageUrl', 'link', 'imageWidth', 'imageHeight'])
     const results = (data.images || []).map((r: any, i: number) => ({
       id: String(i + 1),
       title: r.title || 'No title',
@@ -356,6 +361,7 @@ app.get('/news', async (req: Request, res: Response) => {
     }
 
     const data = await serperRes.json()
+    warnOnMissingFields('news', data, ['news'])
     const latencyMs = Date.now() - t0
 
     stats.totalQueries++
@@ -363,6 +369,7 @@ app.get('/news', async (req: Request, res: Response) => {
     stats.latencies.push(latencyMs)
     if (stats.latencies.length > 200) stats.latencies.shift()
 
+    warnOnMissingFields('news.news', data.news, ['title', 'link', 'snippet', 'source', 'date'])
     const results = (data.news || []).map((r: any, i: number) => ({
       id: String(i + 1),
       title: r.title || 'No title',

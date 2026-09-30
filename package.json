@@ -12,7 +12,9 @@
     "mcp": "tsx mcp-server/index.ts",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "test:search": "tsx scripts/test-search.ts",
-    "test:suggestions": "tsx scripts/test-search.ts \"Stellar blockchain\" --count 3",
+    "test:suggestions": "tsx scripts/test-search.ts \"Stellar blockchain\" --count 3\",
+    "test": "tsx --test server/serper.test.ts",
+    "test:serper-schema": "tsx scripts/check-serper-schema.ts",
     "deploy": "npm run build && vercel --prod"
   },
   "dependencies": {
@@ -57,4 +59,3 @@
     ]
   }
 }
-
