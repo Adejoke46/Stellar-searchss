@@ -5,6 +5,7 @@ dist/
 .DS_Store
 *.log
 .vite/
+coverage/
 
 # Local scripts
 create_issues.py
