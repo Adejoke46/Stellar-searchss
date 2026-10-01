@@ -42,6 +42,27 @@ const stats = {
   cacheMisses: 0,
 }
 
+// ─── In-memory receipts ───────────────────────────────────────────────────
+export interface Receipt {
+  id: string
+  timestamp: string      // ISO-8601
+  type: 'search' | 'images' | 'news'
+  query: string
+  amountUsdc: string     // e.g. "0.001"
+  currency: 'USDC'
+  network: string
+  txHash: string | null
+  latencyMs: number
+}
+
+const MAX_RECEIPTS = 500
+export const receipts: Receipt[] = []
+
+export function addReceipt(receipt: Receipt): void {
+  receipts.unshift(receipt)
+  if (receipts.length > MAX_RECEIPTS) receipts.length = MAX_RECEIPTS
+}
+
 // ─── Query Cache ──────────────────────────────────────────────────────────
 // Cache hits are still charged. The x402 payment middleware runs before this
 // route handler, so identical requests within the TTL pay the fee but skip
@@ -348,6 +369,18 @@ app.get('/search', async (req: Request, res: Response) => {
 
     queryCache.set(cacheKey, { data: responseData, timestamp: Date.now() })
 
+    addReceipt({
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      type: 'search',
+      query: cleanQ,
+      amountUsdc: AMOUNT_USDC,
+      currency: 'USDC',
+      network: NETWORK,
+      txHash,
+      latencyMs,
+    })
+
     return res.json(responseData)
   } catch (err: any) {
     console.error('[search error]', err.message)
@@ -445,6 +478,18 @@ app.get('/images', async (req: Request, res: Response) => {
 
     queryCache.set(cacheKey, { data: responseData, timestamp: Date.now() })
 
+    addReceipt({
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      type: 'images',
+      query: cleanQ,
+      amountUsdc: AMOUNT_USDC,
+      currency: 'USDC',
+      network: NETWORK,
+      txHash,
+      latencyMs,
+    })
+
     return res.json(responseData)
   } catch (err: any) {
     console.error('[images error]', err.message)
@@ -539,6 +584,18 @@ app.get('/news', async (req: Request, res: Response) => {
     }
 
     queryCache.set(cacheKey, { data: responseData, timestamp: Date.now() })
+
+    addReceipt({
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      type: 'news',
+      query: cleanQ,
+      amountUsdc: AMOUNT_USDC,
+      currency: 'USDC',
+      network: NETWORK,
+      txHash,
+      latencyMs,
+    })
 
     return res.json(responseData)
   } catch (err: any) {
@@ -697,6 +754,52 @@ app.post('/summarize-url', async (req: Request, res: Response) => {
   }
 })
 
+// ─── GET /receipts ────────────────────────────────────────────────────────
+// Returns the in-memory paid-query receipts, optionally filtered to a date
+// range via ISO-8601 `from` and `to` query parameters.  Also returns a
+// `totalSpent` summary so an agent can report its own costs without having
+// to sum the amounts itself.
+app.get('/receipts', (req: Request, res: Response) => {
+  const { from, to, limit: limitParam } = req.query as Record<string, string>
+
+  let filtered = receipts
+
+  if (from) {
+    const fromMs = Date.parse(from)
+    if (isNaN(fromMs)) {
+      return res.status(400).json({ error: '`from` must be a valid ISO-8601 date string' })
+    }
+    filtered = filtered.filter((r) => Date.parse(r.timestamp) >= fromMs)
+  }
+
+  if (to) {
+    const toMs = Date.parse(to)
+    if (isNaN(toMs)) {
+      return res.status(400).json({ error: '`to` must be a valid ISO-8601 date string' })
+    }
+    filtered = filtered.filter((r) => Date.parse(r.timestamp) <= toMs)
+  }
+
+  if (limitParam !== undefined) {
+    const n = parseInt(limitParam, 10)
+    if (isNaN(n) || n < 1) {
+      return res.status(400).json({ error: '`limit` must be a positive integer' })
+    }
+    filtered = filtered.slice(0, n)
+  }
+
+  const totalSpentUsdc = filtered
+    .reduce((sum, r) => sum + parseFloat(r.amountUsdc), 0)
+    .toFixed(6)
+
+  return res.json({
+    receipts: filtered,
+    count: filtered.length,
+    totalSpentUsdc,
+    currency: 'USDC',
+  })
+})
+
 // ─── GET /health ──────────────────────────────────────────────────────────
 app.get('/health', (req: Request, res: Response) => {
   const avg = stats.latencies.length
@@ -752,6 +855,7 @@ app.get('/', (_req: Request, res: Response) => {
       'GET /news?q=<query>':   '0.001 USDC via x402 — news articles',
       'POST /ai/chat':         'Groq AI — free',
       'POST /summarize-url':   'Fetch a public URL and summarise it with Groq — free',
+      'GET /receipts':         'List past paid-query receipts with total-spent summary',
       'GET /health':           'Live server stats',
     },
   })
