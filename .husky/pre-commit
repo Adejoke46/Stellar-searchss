@@ -2,3 +2,5 @@
 . "$(dirname "$0")/_husky.sh"
 npm run typecheck
 npx lint-staged
+
+npx --no-install gitleaks protect --staged --red-actual --verbose
