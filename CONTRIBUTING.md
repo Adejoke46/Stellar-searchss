@@ -477,7 +477,15 @@ const signedAuthEntry = Buffer.from(raw as unknown as Uint8Array).toString('base
 
 ## Testing
 
-Currently the project relies on manual testing. We are actively adding automated tests — see the open [testing issues](https://github.com/StellarAgent-AI-Agent-Payment-Rails/Stellar-searchss/issues?q=is%3Aopen+label%3Atesting). If you are adding a new hook or server route, please include tests.
+The frontend uses Vitest, React Testing Library, and jsdom for component tests. See the open [testing issues](https://github.com/StellarAgent-AI-Agent-Payment-Rails/Stellar-searchss/issues?q=is%3Aopen+label%3Atesting) for areas that still need coverage. If you add a hook, component, or server route, include focused tests where practical.
+
+### Component-test conventions
+
+- Put tests next to the component as `<Component>.test.tsx`.
+- Render with React Testing Library and query by accessible role or label before using test IDs.
+- Test user-visible behavior (including guards and empty/loading states), not implementation details.
+- Mock network, wallet, and toast boundaries; do not make payment calls from unit tests.
+- Run `npm test` for a one-shot Vitest run or `npm run test:watch` while developing.
 
 ### Manual testing checklist
 
