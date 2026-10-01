@@ -21,6 +21,7 @@ export interface WalletState {
   xlmBalance: string
   usdcBalance: string
   loading: boolean
+  refreshing: boolean
   error: string | null
   hint: string | null
 }
@@ -110,6 +111,7 @@ export function useFreighterWallet() {
     xlmBalance: '0',
     usdcBalance: '0',
     loading: false,
+    refreshing: false,
     error: null,
     hint: null,
   })
@@ -118,6 +120,7 @@ export function useFreighterWallet() {
   const [txLoadingMore, setTxLoadingMore] = useState(false)
   const [txCursor, setTxCursor] = useState<string | null>(null)
   const [txHasMore, setTxHasMore] = useState(false)
+  const [transactionError, setTransactionError] = useState<string | null>(null)
 
   // Fetch real balances from Horizon
   const fetchBalances = useCallback(async (publicKey: string) => {
@@ -171,6 +174,7 @@ export function useFreighterWallet() {
   const fetchTransactions = useCallback(
     async (publicKey: string, pageSize: number = DEFAULT_TX_PAGE_SIZE) => {
       setTxLoading(true)
+      setTransactionError(null)
       try {
         const ops = await withBackoff(() =>
           horizon
@@ -190,9 +194,8 @@ export function useFreighterWallet() {
         setTxHasMore(ops.records.length === pageSize)
       } catch (err: any) {
         if (!isRateLimitError(err)) {
-          setTransactions([])
-          setTxCursor(null)
-          setTxHasMore(false)
+          console.error('Failed to load transactions:', err)
+          setTransactionError('Could not load transactions. Please try again.')
         }
       } finally {
         setTxLoading(false)
@@ -233,6 +236,8 @@ export function useFreighterWallet() {
         setTxHasMore(ops.records.length === pageSize)
       } catch (err: any) {
         if (!isRateLimitError(err)) {
+          console.error('Failed to load more transactions:', err)
+          setTransactionError('Could not load transactions. Please try again.')
           // Keep existing transactions on failure and stop further paging attempts
           setTxHasMore(false)
         }
@@ -299,6 +304,7 @@ export function useFreighterWallet() {
       xlmBalance: '0',
       usdcBalance: '0',
       loading: false,
+      refreshing: false,
       error: null,
       hint: null,
     })
@@ -308,9 +314,13 @@ export function useFreighterWallet() {
   }, [])
 
   const refresh = useCallback(async () => {
-    if (wallet.publicKey) {
+    if (!wallet.publicKey) return
+    setWallet(prev => ({ ...prev, refreshing: true }))
+    try {
       await fetchBalances(wallet.publicKey)
       await fetchTransactions(wallet.publicKey)
+    } finally {
+      setWallet(prev => ({ ...prev, refreshing: false }))
     }
   }, [wallet.publicKey, fetchBalances, fetchTransactions])
 
@@ -357,6 +367,7 @@ export function useFreighterWallet() {
     wallet,
     transactions,
     txLoading,
+    transactionError,
     txLoadingMore,
     txHasMore,
     loadMoreTransactions,
