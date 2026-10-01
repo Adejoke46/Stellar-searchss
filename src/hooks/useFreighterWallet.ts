@@ -138,7 +138,7 @@ export function useFreighterWallet() {
         } else if (
           balance.asset_type === 'credit_alphanum4' &&
           (balance as any).asset_code === 'USDC' &&
-          (balance as any).asset_issuer === USDB_ISSUER
+          (balance as any).asset_issuer === USDC_ISSUER
         ) {
           usdc = parseFloat(balance.balance).toFixed(6)
         }
@@ -181,24 +181,7 @@ export function useFreighterWallet() {
             .call()
         )
 
-        const txs: StellarTransaction[] = ops.records
-          .filter((op: any) => op.type === 'payment' || op.type === 'create_account')
-          .map((op: any) => ({
-            id: op.id,
-            hash: op.transaction_hash,
-            type: op.type,
-            amount: op.amount ? parseFloat(op.amount).toFixed(4) : '—',
-            asset:
-              op.asset_type === 'native'
-                ? 'XLM'
-                : op.asset_code || 'Unknown',
-            from: op.from || op.funder || '',
-            to: op.to || op.account || '',
-            timestamp: op.created_at,
-            memo: op.transaction?.memo,
-          }))
-
-const txs = ops.records
+        const txs = ops.records
           .filter((op: any) => op.type === 'payment' || op.type === 'create_account')
           .map(mapOperation)
 
