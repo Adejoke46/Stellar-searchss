@@ -529,11 +529,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const res = await fetch(`${SERVER_URL}/search?${params}`)
 
       if (!res.ok) {
-        const e = await res.json().catch(() => ({}))
+        const e: any = await res.json().catch(() => ({}))
         throw new Error(e.error || `HTTP ${res.status}`)
       }
 
-      const data = await res.json()
+      const data: any = await res.json()
       const formatted = data.results
         .map((r: any, i: number) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.description}`)
         .join('\n\n')

@@ -22,10 +22,10 @@ import logger from './logger'
 import { fetchPageText, UrlSummaryError } from './urlSummary'
 import {
   STELLAR_NETWORK,
-  HORIZON_URL, 
-  AMOUNT_USDC, 
-  AMOUNT_STROOPS 
-} from '../src/lib/constants'
+  HORIZON_URL,
+  AMOUNT_USDC,
+  AMOUNT_STROOPS
+} from '../shared/constants.js'
 
 dotenv.config()
 
@@ -270,7 +270,7 @@ app.get('/search', async (req: Request, res: Response) => {
       return res.status(502).json({ error: `Serper.dev API error: ${serperRes.status}` })
     }
 
-    const data = await serperRes.json()
+    const data: any = await serperRes.json()
     const latencyMs = Date.now() - t0
 
     stats.totalQueries++
@@ -411,7 +411,7 @@ app.get('/images', async (req: Request, res: Response) => {
       return res.status(502).json({ error: `Serper.dev API error: ${serperRes.status}` })
     }
 
-    const data = await serperRes.json()
+    const data: any = await serperRes.json()
     const latencyMs = Date.now() - t0
 
     stats.totalQueries++
@@ -507,7 +507,7 @@ app.get('/news', async (req: Request, res: Response) => {
       return res.status(502).json({ error: `Serper.dev API error: ${serperRes.status}` })
     }
 
-    const data = await serperRes.json()
+    const data: any = await serperRes.json()
     const latencyMs = Date.now() - t0
 
     stats.totalQueries++
