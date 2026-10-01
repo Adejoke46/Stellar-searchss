@@ -244,9 +244,11 @@ Claude Code / any MCP client
 The MCP server sits in front of the same Express routes, so an agent using Claude Code
 pays through the identical x402 flow.
 
-## Search history and privacy
-
-Successful paid searches keep a receipt in the current browser’s localStorage with the transaction hash, amount, timestamp, and network. Query text is **not stored by default**. To opt in, enable **Save search query text in this browser** in the Dashboard. Turning it off removes query text from existing receipts, while keeping payment metadata. Use **Clear receipts** in the Dashboard to delete all locally stored receipts. The app keeps at most the 50 most recent receipts; clearing browser site data also removes them.
+> **Security:** payment *is* authentication in this project — there are no accounts, sessions, or API
+> keys, so the security of the payment flow is the security of the product. The trust boundaries
+> between client, server, facilitator, and the Stellar network are documented in the
+> **[payment flow threat model](docs/threat-model.md)**, which also enumerates the known attacks and
+> mitigations. See [`SECURITY.md`](SECURITY.md) for the security policy and reporting process.
 
 ---
 
@@ -299,12 +301,13 @@ stellar-search/
 ├── mcp-server/
 │   └── index.ts                        # MCP tools (see below)
 ├── scripts/
-│   ├── setup.sh                        # One-shot env setup
-│   └── test-search.ts                  # End-to-end x402 test script
-├── public/favicon.svg
+│   └── test-search.ts          # End-to-end test script
+├── docs/
+│   └── threat-model.md         # Payment flow trust boundaries and attack analysis
 ├── .env.example
 ├── vercel.json                 # Committed build + routing config
 ├── claude_mcp.json
+├── SECURITY.md
 └── README.md
 ```
 
