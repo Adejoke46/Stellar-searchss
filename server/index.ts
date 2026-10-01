@@ -9,6 +9,7 @@ import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { buildCorsOptions, getCorsStartupMessage } from './corsConfig.js'
+import { createRateLimiter } from './ratelimit.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const { version: APP_VERSION } = JSON.parse(
@@ -130,6 +131,15 @@ app.use(compression({
   },
 }))
 app.use(express.json())
+
+// ─── Rate limiting (free, cost-bearing endpoints) ─────────────────────────
+// /ai/chat and /summarize-url are free but each triggers a Groq call (and the
+// latter a network fetch), so they are the abuse-prone surface. Limits are
+// keyed per client IP so one caller cannot starve the rest.
+const freeRouteLimiter = createRateLimiter({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
+  max: Number(process.env.RATE_LIMIT_MAX) || 30,
+})
 
 // ─── x402 payment guard on /search ───────────────────────────────────────
 // paymentMiddlewareFromConfig is the recommended API per official Stellar docs.
@@ -608,7 +618,7 @@ app.get('/news', async (req: Request, res: Response) => {
 // Streams responses as Server-Sent Events when the client sends
 // `Accept: text/event-stream`; otherwise returns the full completion as JSON
 // (back-compat fallback for callers that don't support SSE).
-app.post('/ai/chat', async (req: Request, res: Response) => {
+app.post('/ai/chat', freeRouteLimiter, async (req: Request, res: Response) => {
   const { messages } = req.body as {
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
   }
@@ -702,7 +712,7 @@ app.post('/ai/chat', async (req: Request, res: Response) => {
 // link-local addresses are refused, including via redirects and DNS rebinding.
 const MAX_INSTRUCTION_LENGTH = 200
 
-app.post('/summarize-url', async (req: Request, res: Response) => {
+app.post('/summarize-url', freeRouteLimiter, async (req: Request, res: Response) => {
   const { url, instruction } = (req.body ?? {}) as { url?: unknown; instruction?: unknown }
 
   let task = 'Summarise the page in a few short paragraphs, then list the key points.'
