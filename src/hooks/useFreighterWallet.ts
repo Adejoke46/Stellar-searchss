@@ -12,7 +12,7 @@ import {
   getNetwork,
 } from '@stellar/freighter-api'
 import { Horizon } from '@stellar/stellar-sdk'
-import { HORIZON_URL, USDB_ISSUER } from '../lib/stellar'
+import { HORIZON_URL, USDC_ISSUER } from '../lib/stellar'
 
 export interface WalletState {
   publicKey: string | null
@@ -39,7 +39,7 @@ export interface StellarTransaction {
 
 export const DEFAULT_TX_PAGE_SIZE = 15
 
-const horizon = new Horizon.Server(HORIZON_URL)
+export const horizon = new Horizon.Server(HORIZON_URL)
 
 function mapOperation(op: any): StellarTransaction {
   return {
