@@ -21,7 +21,8 @@
     "deploy": "npm run build && vercel --prod",
     "load-test": "node scripts/load-test.js",
     "test:url": "node --import tsx --test server/urlSummary.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:a11y": "vitest run src/a11y.test.tsx"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -67,7 +68,8 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "vitest-axe": "^0.1.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
