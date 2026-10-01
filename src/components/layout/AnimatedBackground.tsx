@@ -1,5 +1,62 @@
 import { useEffect, useRef } from 'react'
 
+interface AnimationLoopOptions {
+  isVisible: () => boolean
+  isReducedMotion: () => boolean
+  requestFrame: typeof requestAnimationFrame
+  cancelFrame: typeof cancelAnimationFrame
+  draw: () => void
+  addVisibilityListener: (listener: () => void) => void
+  removeVisibilityListener: (listener: () => void) => void
+  addMotionListener?: (listener: () => void) => void
+  removeMotionListener?: (listener: () => void) => void
+}
+
+export function createAnimationLoopController(options: AnimationLoopOptions) {
+  let frameId: number | null = null
+  let disposed = false
+
+  const stop = () => {
+    if (frameId === null) return
+    options.cancelFrame(frameId)
+    frameId = null
+  }
+
+  const schedule = () => {
+    if (disposed || frameId !== null || !options.isVisible() || options.isReducedMotion()) return
+    frameId = options.requestFrame(() => {
+      frameId = null
+      if (disposed || !options.isVisible() || options.isReducedMotion()) return
+      options.draw()
+      schedule()
+    })
+  }
+
+  const handleVisibilityChange = () => {
+    if (options.isVisible()) schedule()
+    else stop()
+  }
+
+  const handleMotionChange = () => {
+    if (options.isReducedMotion()) stop()
+    else schedule()
+  }
+
+  options.addVisibilityListener(handleVisibilityChange)
+  options.addMotionListener?.(handleMotionChange)
+  schedule()
+
+  return {
+    stop,
+    cleanup: () => {
+      disposed = true
+      stop()
+      options.removeVisibilityListener(handleVisibilityChange)
+      options.removeMotionListener?.(handleMotionChange)
+    },
+  }
+}
+
 export function AnimatedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -8,8 +65,10 @@ export function AnimatedBackground() {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) return
 
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
 
     let animId: number
     const matrixChars = '01ABCDEF⬊̖
@@ -21,6 +80,9 @@ export function AnimatedBackground() {
     }
     resize()
     window.addEventListener('resize', resize)
+    let visible = !document.hidden
+    const onVisibility = () => { visible = !document.hidden }
+    document.addEventListener('visibilitychange', onVisibility)
 
     const columns = Array.from({ length: Math.floor(window.innerWidth / 28) }, (_, i) => ({
       x: i * 28,
@@ -45,6 +107,7 @@ export function AnimatedBackground() {
     let frame = 0
 
     const draw = () => {
+      if (!visible) { animId = requestAnimationFrame(draw); return }
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       frame++
 
@@ -108,10 +171,8 @@ export function AnimatedBackground() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke()
       }
 
-      animId = requestAnimationFrame(draw)
     }
-
-    const renderStatic = () => {
+const renderStatic = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       const g = ctx.createRadialGradient(
         canvas.width * 0.5, canvas.height * 0.25, 0,
@@ -132,8 +193,18 @@ export function AnimatedBackground() {
       }
     }
 
+    const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const addMotionListener = (listener: () => void) => {
+      if (reducedMotionQuery.addEventListener) reducedMotionQuery.addEventListener('change', listener)
+      else reducedMotionQuery.addListener(listener)
+    }
+    const removeMotionListener = (listener: () => void) => {
+      if (reducedMotionQuery.removeEventListener) reducedMotionQuery.removeEventListener('change', listener)
+      else reducedMotionQuery.removeListener(listener)
+    }
+
     const start = () => {
-      if (mediaQuery.matches) {
+      if (reducedMotionQuery.matches) {
         renderStatic()
       } else {
         draw()
@@ -146,12 +217,24 @@ export function AnimatedBackground() {
     }
 
     start()
-    mediaQuery.addEventListener('change', handleChange)
+    addMotionListener(handleChange)
+    const animationLoop = createAnimationLoopController({
+      isVisible: () => document.visibilityState === 'visible',
+      isReducedMotion: () => reducedMotionQuery.matches,
+      requestFrame: requestAnimationFrame,
+      cancelFrame: cancelAnimationFrame,
+      draw,
+      addVisibilityListener: listener => document.addEventListener('visibilitychange', listener),
+      removeVisibilityListener: listener => document.removeEventListener('visibilitychange', listener),
+      addMotionListener,
+      removeMotionListener,
+    })
 
     return () => {
-      cancelAnimationFrame(animId)
+      animationLoop.cleanup()
       window.removeEventListener('resize', resize)
-      mediaQuery.removeEventListener('change', handleChange)
+mediaQuery.removeEventListener('change', handleChange)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [])
 

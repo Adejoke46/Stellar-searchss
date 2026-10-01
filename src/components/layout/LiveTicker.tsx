@@ -51,7 +51,7 @@ export function LiveTicker({ walletConnected }: Props) {
         className={`flex items-center gap-8 whitespace-nowrap ${prefersReducedMotion ? '' : 'animate-ticker'}`}
         style={{ width: prefersReducedMotion ? 'auto' : 'max-content' }}
       >
-        {doubled.map(([k, v], i) => (
+        {doubled.map(([i, v], i) => (
           <div key={i} className="inline-flex items-center gap-2 px-6">
             <span
               className="font-display text-neon-cyan/30 tracking-widest"
