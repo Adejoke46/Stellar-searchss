@@ -2,27 +2,28 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Coins, ExternalLink, ShieldAlert, X } from 'lucide-react'
 import { IS_MAINNET, USDC_ISSUER } from '../../lib/stellar'
+import { FUNDING_URLS } from '../../lib/funding'
 
 interface Props {
   connected: boolean
   publicKey: string | null
   usdcBalance: string
-  /**
+/**
    * `null` means the trustline state has not been determined yet.
    */
   usddTrustline?: boolean | null
-}
 
-const FAUCET_URL = 'https://laboratory.stellar.org/#account-creator?network=test'
-const TRUSTLINE_GUIDE_URL =
-  'https://developers.stellar.org/docs/learn/fundamentals/stellar-data-structures/accounts#trustlines'
+  // Navigates to the funding guide section on the docs page via SPA routing
+  // (a plain hash anchor would reload the app back to the search page).
+  onOpenGuide: () => void
+}
 
 const dismissKey = (publicKey: string) => `zero-balance-banner-dismissed:${publicKey}`
 
 const trustlineDismissKey = (publicKey: string) =>
   `usdc-trustline-banner-dismissed:${publicKey}`
 
-export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrustline }: Props) {
+export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrustline, onOpenGuide }: Props) {
   const [dismissed, setDismissed] = useState(false)
 
   // Reset / restore dismissal state when the connected account changes.
@@ -64,16 +65,16 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
           style={{ boxShadow: '0 0 20px rgba(255,193,7,0.06)' }}
           role="status"
         >
-          {missingTrustline ? (
+{missingTrustline ? (
             <ShieldAlert className="w-4 h-4 mt-0.5 text-neon-amber flex-shrink-0" />
           ) : (
             <Coins className="w-4 h-4 mt-0.5 text-neon-amber flex-shrink-0" />
           )}
-          <div className="flex-1 min-w0-0 space-2">
+          <div className="flex-1 min-w-0 space-y-2">
             {missingTrustline ? (
               <>
                 <p className="text-sm text-neon-amber/90 leading-relaxed">
-                  Your account has <span class="font-semibold">no USDC trustline</span>, so it cannot receive USDC at all.
+                  Your account has <span className="font-semibold">no USDC trustline</span>, so it cannot receive USDC at all.
                   Add one before using the faucet.
                 </p>
                 <p className="text-xs text-white/45 break-all">
@@ -95,29 +96,7 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
             ) : (
               <>
                 <p className="text-sm text-neon-amber/90 leading-relaxed">
-                  Your USDC trustline is set up, but the balance is zero. You need testnet USDC to search.{' '}
-                  <a
-                    href={FAUCET_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium underline underline-offset-2 hover:text-neon-amber transition-colors inline-flex items-center gap-1"
-                  >
-                    Get free USDC <ExternalLink className="w-3 h-3" />
-                  </a>
-                </p>
-                <p className="text-xs text-white/45">
-                  New to Stellar?{' '}
-                  <a
-                    href={TRUSTLINE_GUIDE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-neon-cyan/80 hover:text-neon-cyan transition-colors inline-flex items-center gap-1"
-                  >
-                    USDC trustline setup guide <ExternalLink className="w-3 h-3" />
-                  </a>
-                </p>
-              </>
-            )}
+                  Your USDC trustline is set up, but the balance is zero. You need testnet USDC to search
           </div>
           <button
             onClick={onDismiss}
