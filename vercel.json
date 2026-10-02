@@ -1,5 +1,20 @@
 {
+  "$schema": "https://openapi.vercel.com/v1/vercel.json",
   "$comment": "CSP is enforced via the headers below. Start in report-only mode by setting CSP_REPORT_ONLY=true in the Vercel project environment and collect violations before flipping it off.",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/(:path*)",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/((?!.*\\..).*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
