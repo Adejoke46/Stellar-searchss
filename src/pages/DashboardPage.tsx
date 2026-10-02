@@ -95,6 +95,7 @@ export function DashboardPage({ transactions, txLoading, publicKey, usdcBalance,
           <button
             onClick={onRefresh}
             disabled={txLoading}
+            aria-label="Refresh dashboard data"
             className="p-2 rounded-lg border border-white/10 text-white/30 hover:text-neon-cyan transition-colors disabled:opacity-40"
           >
             <RefreshCw className={`w-4 h-4 ${txLoading ? 'animate-spin' : ''}`} />
@@ -185,7 +186,7 @@ export function DashboardPage({ transactions, txLoading, publicKey, usdcBalance,
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  tickFormatter={(val) => `$${val}`}
+                  tickFormatter={(val: number) => `$${val}`}
                   fontFamily="monospace"
                 />
                 <Tooltip 

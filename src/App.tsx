@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo }         from 'react'
-import { motion, AnimatePresence }             from 'framer-motion'
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 import { AnimatedBackground, Navbar, LiveTicker, Footer } from './components/layout'
 import { GroqAssistant }                       from './components/ai'
 import { SearchPage, DocsPage, DashboardPage } from './pages'
@@ -45,7 +45,7 @@ export default function App() {
 
   // Lifted so the floating GroqAssistant can read the last completed search
   // and pre-populate context (issue #57).
-  const { session, search, reset } = useSearch(
+  const { session, search, reset, retry } = useSearch(
     wallet.connected ? wallet.publicKey : null
   )
 
@@ -57,6 +57,7 @@ export default function App() {
   )
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen relative text-white">
       <a href="#main-content" className="skip-link">
         Skip to main content
@@ -98,6 +99,7 @@ export default function App() {
                   session={session}
                   search={search}
                   reset={reset}
+                  retry={retry}
                   onNavigateFundingGuide={() => navigate('docs', 'get-testnet-usdc')}
                 />
               )}
@@ -135,5 +137,6 @@ export default function App() {
 
       <Toaster position="bottom-right" theme="dark" duration={4000} richColors />
     </div>
+    </MotionConfig>
   )
 }
