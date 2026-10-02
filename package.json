@@ -7,7 +7,7 @@
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "dev": "vite",
-    "test": "vitest run",
+    "test": "tsc --noEmit",
     "test:watch": "vitest",
     "build": "tsc && vite build",
     "analyze": "ANALYZE=1 tsc && ANALYZE=1 vite build",
@@ -15,7 +15,6 @@
     "server": "tsx server/index.ts",
     "mcp": "tsx mcp-server/index.ts",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
-    "test": "tsc --noEmit",
     "test:search": "tsx scripts/test-search.ts",
     "test:suggestions": "tsx scripts/test-search.ts \"Stellar blockchain\" --count 3",
     "test:parity": "tsx tests/parity.test.ts",
@@ -29,7 +28,8 @@
     "test:e2e": "playwright test",
     "test:e2e:dev": "playwright test --project=dev",
     "test:e2e:preview": "playwright test --project=preview",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "mcp:http": "tsx mcp-server/index.ts --transport http"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -84,6 +84,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
+      "bash -c 'tsc --noEmit'",
       "eslint --fix"
     ]
   }
