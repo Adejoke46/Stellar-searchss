@@ -5,6 +5,7 @@ import express, { Request, Response } from 'express'
 import compression from 'compression'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import helmet from 'helmet'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -133,6 +134,52 @@ app.use(compression({
 }))
 app.use(express.json())
 
+// ─── Content Security Policy ─────────────────────────────────────────────
+// Origins the app actually needs:
+//   - 'self'                 — the app bundle and its own API
+//   - Horizon (STELLAR_NETWORK dependent) — Stellar RPC/Horizon calls
+//   - Serper image CDNs      — remote thumbnails/full images from image search
+//   - Groq API               — AI chat (server-side only, but kept for safety)
+// Inline styles are disallowed; the design must move styles into stylesheets.
+const CSP_DIRECTIVES = {
+  defaultSrc:     ["'self'"],
+  scriptSrc:      ["'self'"],
+  styleSrc:       ["'self'"],
+  imgSrc:         [
+    "'self'",
+    'data:',
+    'https://*.serper.dev',
+    'https://*.googleusercontent.com',
+    'https://*.gstatic.com',
+    'https://*.ggpht.com',
+  ],
+  connectSrc:     [
+    "'self'",
+    HORIZON_URL,
+    'https://*.serper.dev',
+    'https://api.groq.com',
+  ],
+  fontSrc:        ["'self'", 'data:'],
+  objectSrc:      ["'none'"],
+  baseUri:        ["'self'"],
+  frameAncestors: ["'none'"],
+  formAction:     ["'self'"],
+  upgradeInsecureRequests: [],
+}
+
+// Start in report-only mode; flip to enforce via CSP_ENFORCE=1 once the
+// violation reports are clean.
+const cspEnforced = process.env.CSP_ENFORCE === '1'
+app.use(
+  helmet({
+    contentSecurityPolicy: cspEnforced
+      ? { useDefaults: false, directives: CSP_DIRECTIVES }
+      : { useDefaults: false, directives: CSP_DIRECTIVES, reportOnly: true },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+)
+
 // ─── Rate limiting (free, cost-bearing endpoints) ─────────────────────────
 // /ai/chat and /summarize-url are free but each triggers a Groq call (and the
 // latter a network fetch), so they are the abuse-prone surface. Limits are
@@ -141,7 +188,6 @@ const freeRouteLimiter = createRateLimiter({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000,
   max: Number(process.env.RATE_LIMIT_MAX) || 30,
 })
-
 // ─── x402 payment guard on /search ───────────────────────────────────────
 // paymentMiddlewareFromConfig is the recommended API per official Stellar docs.
 // It uses the Coinbase public facilitator (no API key needed for testnet).
