@@ -1,4 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <!-- EDITABLE SOURCE: this SVG is the source for public/social-preview.png.
+       Scrapers do not render SVG og:images, so index.html points at the PNG.
+       Regenerate after edits with:
+       cairosvg.svg2png(url='public/social-preview.svg', write_to='public/social-preview.png', output_width=1200, output_height=630) -->
   <title id="title">StellarSearch</title>
   <desc id="desc">Pay-per-query AI search settled on Stellar</desc>
   <rect width="1200" height="630" fill="#060d14"/>
