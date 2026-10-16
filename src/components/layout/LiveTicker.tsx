@@ -53,7 +53,7 @@ export function LiveTicker({ walletConnected }: Props) {
         style={{ width: prefersReducedMotion ? 'auto' : 'max-content' }}
       >
         {doubled.map(([k, v], idx) => (
-          <div key={idx} className="inline-flex items-center gap-2 px-6">
+          <div key={idx} className="inline-flex items-center px-6">
             <span
               className="font-display text-neon-cyan/70 tracking-widest"
               style={{ fontSize: '10px' }}

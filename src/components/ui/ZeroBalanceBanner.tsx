@@ -4,6 +4,10 @@ import { Coins, ExternalLink, ShieldAlert, X } from 'lucide-react'
 import { IS_MAINNET, USDC_ISSUER } from '../../lib/stellar'
 import { FUNDING_URLS } from '../../lib/funding'
 
+const FAUCET_URL = 'https://laboratory.stellar.org/#account-creator?network=test'
+const TRUSTLINE_GUIDE_URL =
+  'https://developers.stellar.org/docs/learn/fundamentals/stellar-data-structures/accounts#trustlines'
+
 interface Props {
   connected: boolean
   publicKey: string | null
@@ -95,26 +99,26 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
             ) : (
               <>
                 <p className="text-sm text-neon-amber/90 leading-relaxed">
-                  You need testnet USDC to search.{' '}
-                  <button
-                    onClick={onOpenGuide}
-                    className="font-medium underline underline-offset-2 hover:text-neon-amber transition-colors"
+                  Your USDC trustline is set up, but the balance is zero. You need testnet USDC to search.{' '}
+                  <a
+                    href={FAUCET_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium underline underline-offset-2 hover:text-neon-amber transition-colors inline-flex items-center gap-1"
                   >
-                    Follow the step-by-step funding guide
-                  </button>{' '}
-                  (create account → fund XLM → add USDC trustline → claim USDC)
+                    Get free USDC <ExternalLink className="w-3 h-3" />
+                  </a>
                 </p>
                 <p className="text-xs text-white/60">
-                  Already set up?{' '}
+                  New to Stellar?{' '}
                   <a
-                    href={FUNDING_URLS.usdcFaucet}
+                    href={TRUSTLINE_GUIDE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-neon-cyan/80 hover:text-neon-cyan transition-colors inline-flex items-center gap-1"
                   >
-                    Claim USDC from the faucet <ExternalLink className="w-3 h-3" />
-                  </a>{' '}
-                  — requires the USDC trustline first.
+                    USDC trustline setup guide <ExternalLink className="w-3 h-3" />
+                  </a>
                 </p>
               </>
             )}

@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "setup": "bash scripts/setup.sh",
+    "prepare": "husky install",
     "dev": "vite",
-    "test": "vitest run",
+    "test": "tsx --test mcp-server/index.test.ts",
     "test:watch": "vitest",
     "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "analyze": "ANALYZE=1 tsc && ANALYZE=1 vite build",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
@@ -24,7 +26,6 @@
     "deploy": "npm run build && vercel --prod",
     "load-test": "node scripts/load-test.js",
     "test:url": "node --import tsx --test server/urlSummary.test.ts",
-    "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
     "test:a11y": "vitest run src/a11y.test.tsx",
     "test:e2e": "playwright test",
@@ -52,6 +53,7 @@
     "express": "^4.18.2",
     "framer-motion": "^11.0.0",
     "groq-sdk": "^0.9.0",
+    "helmet": "^8.3.0",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -91,11 +93,14 @@
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
     "vitest": "^2.1.9",
-    "vitest-axe": "^0.1.0"
+    "vitest-axe": "^0.1.0",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^8.0.3"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "bash -c 'tsc --noEmit'",
+      "bash -c 'npm run typecheck'",
       "eslint --fix"
     ]
   }

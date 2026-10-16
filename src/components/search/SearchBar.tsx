@@ -23,27 +23,31 @@ export function SearchBar({
   useEffect(() => {
     inputRef.current?.focus()
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isSlash = e.key === '/'
-      const isCmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const input = inputRef.current
+      if (!input || input.disabled || event.defaultPrevented || event.isComposing) return
 
-      if (isSlash || isCmdK) {
-        const activeEl = document.activeElement
-        const isInputFocused =
-          activeEl instanceof HTMLInputElement ||
-          activeEl instanceof HTMLTextAreaElement ||
-          activeEl?.getAttribute('contenteditable') === 'true'
+      const isSlash = event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey
+      const isCommandK = event.key.toLowerCase() === 'k'
+        && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+      if (!isSlash && !isCommandK) return
 
-        if (!isInputFocused || (isCmdK && activeEl !== inputRef.current)) {
-          e.preventDefault()
-          inputRef.current?.focus()
-          inputRef.current?.select()
-        }
+      const activeElement = document.activeElement
+      if (activeElement !== input && activeElement instanceof HTMLElement
+        && (activeElement.matches('input, textarea, select') || activeElement.isContentEditable)) {
+        return
       }
+
+      // Keep slash available for queries containing URLs or paths.
+      if (isSlash && activeElement === input) return
+
+      event.preventDefault()
+      input.focus()
+      input.select()
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -99,6 +103,7 @@ export function SearchBar({
             name="q"
             type="text"
             aria-label="Search query"
+            aria-keyshortcuts="/ Control+K Meta+K"
             defaultValue={defaultQuery}
             placeholder={isWrongNetwork ? 'Switch network to search...' : "Search anything — pay per query, not per month..."}
             disabled={isSearching || isWrongNetwork}
@@ -107,7 +112,7 @@ export function SearchBar({
           />
 
           {!isWrongNetwork && (
-            <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] text-white/40 font-mono select-none pointer-events-none">
+            <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] text-white/60 font-mono select-none pointer-events-none">
               <span>/</span>
             </div>
           )}
@@ -148,6 +153,10 @@ export function SearchBar({
           Serper.dev · x402 · Stellar {IS_MAINNET ? 'Mainnet' : 'Testnet'}
         </p>
       </div>
+
+      <p className="mt-2 px-1 text-xs text-white/50">
+        Press <kbd className="font-mono">/</kbd> or <kbd className="font-mono">Ctrl/Cmd + K</kbd> to focus search
+      </p>
     </form>
   )
 }

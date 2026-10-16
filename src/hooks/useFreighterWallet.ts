@@ -64,6 +64,8 @@ export const RECEIPTS_STORAGE_KEY = 'stellar-receipts'
 
 export const DEFAULT_TX_PAGE_SIZE = 15
 
+const horizon = new Horizon.Server(HORIZON_URL)
+
 function loadReceipts(): Receipt[] {
   try {
     const raw = localStorage.getItem(RECEIPTS_STORAGE_KEY)
@@ -90,8 +92,6 @@ function clearReceipts() {
     // localStorage unavailable
   }
 }
-
-export const horizon = new Horizon.Server(HORIZON_URL)
 
 const MAX_RETRIES = 4
 const BASE_DELAY_MS = 1000
@@ -270,22 +270,9 @@ console.error('Failed to load account from Horizon:', err)
             .call()
         )
 
-        const txs: StellarTransaction[] = ops.records
+        const txs = ops.records
           .filter((op: any) => op.type === 'payment' || op.type === 'create_account')
-          .map((op: any) => ({
-            id: op.id,
-            hash: op.transaction_hash,
-            type: op.type,
-            amount: op.amount ? parseFloat(op.amount).toFixed(4) : '—',
-            asset:
-              op.asset_type === 'native'
-                ? 'XLM'
-                : op.asset_code || 'Unknown',
-            from: op.from || op.funder || '',
-            to: op.to || op.account || '',
-            timestamp: op.created_at,
-            memo: op.transaction?.memo,
-          }))
+          .map(mapOperation)
 
         setTransactions(txs)
         setTxCursor(ops.records.length > 0 ? ops.records[ops.records.length - 1].paging_token : null)
@@ -439,7 +426,7 @@ setSearchSession(null)
   }, [])
 
   const refresh = useCallback(async () => {
-    if (!wallet.publicKey) return
+if (!wallet.publicKey) return
     setWallet(prev => ({ ...prev, refreshing: true }))
     try {
       await fetchWalletData(wallet.publicKey)
