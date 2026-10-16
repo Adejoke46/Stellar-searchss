@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         invocation.invocationType === 'warm' ? handlerElapsedMs(invocation) : null,
     }
     result.body = body
-    result.headers.ETag = `W/\"${createHash('sha1').update(JSON.stringify(body)).digest('hex')}\"`
+    result.headers.ETag = `W/"${createHash('sha1').update(JSON.stringify(body)).digest('hex')}"`
   }
 
   return sendResult(res, result)

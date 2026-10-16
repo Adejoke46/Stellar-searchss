@@ -496,10 +496,8 @@ Use this tool when an agent needs to audit or report its own spending.`,
         },
       },
     },
-]
-
-export const listToolsHandler = async () => ({ tools })
-server.setRequestHandler(ListToolsRequestSchema, listToolsHandler)
+  ],
+})
 
 server.setRequestHandler(ListToolsRequestSchema, listToolsHandler)
 
@@ -954,8 +952,6 @@ export const callToolHandler = async (
 
   return { content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }], isError: true }
 }
-server.setRequestHandler(CallToolRequestSchema, callToolHandler)
-
 server.setRequestHandler(CallToolRequestSchema, callToolHandler)
 
 // ─── Resources ────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ interface Props {
   connected: boolean
   publicKey: string | null
   usdcBalance: string
-/**
+  /**
    * `null` means the trustline state has not been determined yet.
    */
   usdcTrustline?: boolean | null
@@ -45,8 +45,7 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
 
   const isZeroBalance = parseFloat(usdcBalance || '0') === 0
   const missingTrustline = usdcTrustline === false
-  const visible =
-    connected && !IS_MAINNET && isZeroBalance && !dismissed
+  const visible = connected && !IS_MAINNET && isZeroBalance && !dismissed
 
   const onDismiss = () => {
     if (publicKey) {
@@ -69,7 +68,7 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
           style={{ boxShadow: '0 0 20px rgba(255,193,7,0.06)' }}
           role="status"
         >
-{missingTrustline ? (
+          {missingTrustline ? (
             <ShieldAlert className="w-4 h-4 mt-0.5 text-neon-amber flex-shrink-0" />
           ) : (
             <Coins className="w-4 h-4 mt-0.5 text-neon-amber flex-shrink-0" />
@@ -81,14 +80,14 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
                   Your account has <span className="font-semibold">no USDC trustline</span>, so it cannot receive USDC at all.
                   Add one before using the faucet.
                 </p>
-                <p className="text-xs text-white/45 break-all">
+                <p className="text-xs text-white/60 break-all">
                   Issuer:
                   <code className="ml-1 font-mono text-white/70">{USDC_ISSUER}</code>
                 </p>
-                <p className="text-xs text-white/45">
+                <p className="text-xs text-white/60">
                   Add the trustline in your wallet, then come back for free testnet USDC.
                   <a
-                    href={TRUSTLINE_GUIDE_URL}
+                    href={FUNDING_URLS.trustlineDocs}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-neon-cyan/80 hover:text-neon-cyan transition-colors inline-flex items-center gap-1 ml-1"
@@ -110,7 +109,7 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
                     Get free USDC <ExternalLink className="w-3 h-3" />
                   </a>
                 </p>
-                <p className="text-xs text-white/45">
+                <p className="text-xs text-white/60">
                   New to Stellar?{' '}
                   <a
                     href={TRUSTLINE_GUIDE_URL}
@@ -127,7 +126,7 @@ export function ZeroBalanceBanner({ connected, publicKey, usdcBalance, usdcTrust
           <button
             onClick={onDismiss}
             aria-label="Dismiss notice"
-            className="absolute top-3 right-3 p-1 rounded text-white/30 hover:text-white/70 transition-colors"
+            className="absolute top-3 right-3 p-1 rounded text-white/60 hover:text-white/70 transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>

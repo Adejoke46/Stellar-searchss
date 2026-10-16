@@ -490,6 +490,7 @@ export function createApp() {
       if (typeof instruction !== 'string' || instruction.length > MAX_INSTRUCTION_LENGTH) {
         return res.status(400).json({ error: `instruction must be a string of at most ${MAX_INSTRUCTION_LENGTH} characters` })
       }
+      // eslint-disable-next-line no-control-regex
       const clean = instruction.replace(/[\x00-\x1F\x7F]/g, ' ').trim()
       if (clean) task = clean
     }

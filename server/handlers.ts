@@ -122,6 +122,7 @@ export function validateQuery(
   }
   // Strip null bytes and ASCII control characters (C0 + DEL) to prevent
   // log injection and odd Serper behavior.
+  // eslint-disable-next-line no-control-regex
   const cleanQ = q.replace(/[\x00-\x1F\x7F]/g, '').trim()
   if (!cleanQ) {
     return { ok: false, error: 'Query contains no valid characters.' }
@@ -309,6 +310,7 @@ export function parseSuggestions(raw: string): string[] {
   const cleaned: string[] = []
   for (const item of parsed) {
     if (typeof item !== 'string') return []
+    // eslint-disable-next-line no-control-regex
     const trimmed = item.replace(/[\x00-\x1F\x7F]/g, '').trim()
     if (!trimmed) return []
     cleaned.push(trimmed.slice(0, MAX_SUGGESTION_LENGTH))
@@ -328,6 +330,7 @@ async function buildSuggestions(
       .slice(0, MAX_SNIPPETS_FED)
       .map((r) =>
         String(r.description || '')
+          // eslint-disable-next-line no-control-regex
           .replace(/[\x00-\x1F\x7F]/g, ' ')
           .slice(0, MAX_SNIPPET_LENGTH),
       )

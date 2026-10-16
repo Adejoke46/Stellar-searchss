@@ -13,9 +13,9 @@ const getEnv = (key: string, fallback: string) => {
   if (typeof process !== 'undefined' && process.env && process.env[key]) {
     return process.env[key]
   }
-  // @ts-ignore
+  // @ts-expect-error -- import.meta.env is provided by Vite at build time.
   if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[`VITE_${key}`]) {
-    // @ts-ignore
+    // @ts-expect-error -- import.meta.env is provided by Vite at build time.
     return import.meta.env[`VITE_${key}`]
   }
   return fallback
