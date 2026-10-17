@@ -13,7 +13,7 @@ import {
 } from '@stellar/freighter-api'
 import { Horizon } from '@stellar/stellar-sdk'
 import { toast } from 'sonner'
-import { HORIZON_URL, USDC_ISSUER } from '../lib/stellar'
+import { getHorizonUrl, USDC_ISSUER } from '../lib/stellar'
 
 export interface WalletState {
   publicKey: string | null
@@ -63,8 +63,6 @@ export interface Receipt {
 export const RECEIPTS_STORAGE_KEY = 'stellar-receipts'
 
 export const DEFAULT_TX_PAGE_SIZE = 15
-
-const horizon = new Horizon.Server(HORIZON_URL)
 
 function loadReceipts(): Receipt[] {
   try {
@@ -178,6 +176,13 @@ export function useFreighterWallet() {
 fundingRequired: false,
     hint: null,
   })
+  // Horizon client keyed on the active network.
+  // Stored in a ref so callbacks always read the current instance without
+  // needing to be recreated on every network change.
+  const horizonRef = useRef<Horizon.Server>(
+    new Horizon.Server(getHorizonUrl(wallet.network))
+  )
+
   const [transactions, setTransactions] = useState<StellarTransaction[]>([])
   const [txLoading, setTxLoading] = useState(false)
 const [receipts, setReceipts] = useState<Receipt[]>(loadReceipts)
@@ -188,14 +193,14 @@ const [receipts, setReceipts] = useState<Receipt[]>(loadReceipts)
   const [transactionError, setTransactionError] = useState<string | null>(null)
 
   // Fetch real balances from Horizon
-  const fetchBalances = useCallback(async (publicKey: string, fetchId: number) => {
+  const fetchBalances = useCallback(async (publicKey: string, fetchId?: number) => {
     try {
       const cached = balanceCache.get(publicKey)
       if (cached && Date.now() - cached.ts < BALANCE_CACHE_TTL_MS) {
         return
       }
 
-      const account = await withBackoff(() => horizon.loadAccount(publicKey))
+      const account = await withBackoff(() => horizonRef.current.loadAccount(publicKey))
 
       let xlm = '0'
       let usdc = '0'
@@ -253,7 +258,7 @@ console.error('Failed to load account from Horizon:', err)
         fundingRequired: false,
       }))
     }
-  }, [horizon, usdcIssuer, wallet.network])
+  }, [])
 
 // Fetch real transaction history from Horizon (first page)
   const fetchTransactions = useCallback(
@@ -262,7 +267,7 @@ console.error('Failed to load account from Horizon:', err)
       setTransactionError(null)
       try {
         const ops = await withBackoff(() =>
-          horizon
+          horizonRef.current
             .operations()
             .forAccount(publicKey)
             .order('desc')
@@ -297,7 +302,7 @@ console.error('Failed to load account from Horizon:', err)
       }
       setTxLoadingMore(true)
       try {
-        const ops = await horizon
+        const ops = await horizonRef.current
           .operations()
           .forAccount(publicKey)
           .order('desc')
@@ -435,6 +440,29 @@ if (!wallet.publicKey) return
     }
   }, [wallet.publicKey, fetchWalletData])
 
+  // Recreate the Horizon client whenever the wallet switches networks.
+  // Also discard all cached balances and stale cross-network data so the
+  // next fetch goes to the correct endpoint.
+  useEffect(() => {
+    horizonRef.current = new Horizon.Server(getHorizonUrl(wallet.network))
+    // Invalidate the entire balance cache — entries from the old network are
+    // wrong on the new one (different accounts, different balances).
+    balanceCache.clear()
+    // Reset account data so stale cross-network balances are not displayed.
+    setWallet(prev => ({
+      ...prev,
+      xlmBalance: '0',
+      usdcBalance: '0',
+      usdcTrustline: null,
+      error: null,
+      fundingRequired: false,
+    }))
+    setTransactions([])
+    setTxCursor(null)
+    setTxHasMore(false)
+    setTransactionError(null)
+  }, [wallet.network])
+
   // Auto-check if already connected on mount
   useEffect(() => {
     const check = async () => {
@@ -488,7 +516,7 @@ if (connected.error) {
   }, [fetchWalletData])
 
   // Freighter does not emit a reliable account-change event in every browser.
-  // Poll while connected so switching accounts updates all account-scoped data.
+  // Poll while connected so switching accounts or networks updates all data.
   useEffect(() => {
     if (!wallet.connected || !wallet.publicKey) return
 
@@ -497,9 +525,43 @@ if (connected.error) {
       if (checking) return
       checking = true
       try {
-        const result = await getAddress()
-        if (!result.error && result.address && result.address !== wallet.publicKey) {
-          const nextAddress = result.address
+        const [addrResult, netResult] = await Promise.all([getAddress(), getNetwork()])
+
+        const networkChanged =
+          !netResult.error &&
+          netResult.network &&
+          netResult.network !== wallet.network
+
+        const addressChanged =
+          !addrResult.error &&
+          addrResult.address &&
+          addrResult.address !== wallet.publicKey
+
+        if (networkChanged) {
+          // Updating wallet.network triggers the network-change useEffect above
+          // which recreates the Horizon client and clears stale data.
+          setWallet(prev => ({
+            ...prev,
+            network: netResult.network!,
+            // Clear publicKey-derived data — the account may differ per network
+            publicKey: addrResult.address || prev.publicKey,
+            error: null,
+          }))
+          setTransactions([])
+          setTxCursor(null)
+          setTxHasMore(false)
+          toast.info('Freighter network switched', {
+            description: `Now querying ${netResult.network} Horizon. Refreshing balances…`,
+          })
+          // Re-fetch after the state flush; use the address from this poll.
+          const nextAddress = addrResult.address || wallet.publicKey
+          await fetchBalances(nextAddress)
+          await fetchTransactions(nextAddress)
+          return
+        }
+
+        if (addressChanged) {
+          const nextAddress = addrResult.address!
           setWallet(prev => ({ ...prev, publicKey: nextAddress, error: null }))
           setTransactions([])
           setTxCursor(null)
@@ -519,7 +581,7 @@ if (connected.error) {
 
     const interval = window.setInterval(checkAddress, 4000)
     return () => window.clearInterval(interval)
-  }, [wallet.connected, wallet.publicKey, fetchBalances, fetchTransactions])
+  }, [wallet.connected, wallet.publicKey, wallet.network, fetchBalances, fetchTransactions])
 
   return {
     wallet,
