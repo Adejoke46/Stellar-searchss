@@ -5,6 +5,16 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
+## Table of Contents
+
+- [Demo](#demo)
+- [What it is](#what-it-is)
+- [Endpoints](#endpoints)
+- [Stack](#stack)
+- [Setup](#setup)
+- [Hackathon requirements](#hackathon-requirements)
+- [License](#license)
+
 ---
 
 ## Demo
