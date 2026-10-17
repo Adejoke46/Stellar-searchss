@@ -24,7 +24,8 @@ module.exports = {
     'react-refresh/only-export-components': 'off',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^', varsIgnorePattern: '^' }],
     '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-console': 'off',
+    // Retain no-console off: while server logging is adopting winston (server/logger.ts),
+    // console methods are still widely used across client-side components, scripts, and utilities.
     'no-console': 'off',
     // `while (true) { ... break }` is an intentional pattern in the SSE readers.
     'no-constant-condition': ['error', { checkLoops: false }],
