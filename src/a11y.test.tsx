@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { render } from '@testing-library/react'
 import { axe } from 'vitest-axe'
 import { describe, expect, it } from 'vitest'
@@ -31,9 +32,11 @@ const wallet: WalletState = {
   network: 'stellar:testnet',
   xlmBalance: '0',
   usdcBalance: '0',
+  usdcTrustline: null,
   loading: false,
   refreshing: false,
   error: null,
+  fundingRequired: false,
   hint: null,
 }
 
@@ -69,7 +72,7 @@ describe('page accessibility smoke checks', () => {
 
   it('checks the dashboard page', async () => {
     const { container } = render(
-      <DashboardPage transactions={[]} txLoading={false} publicKey={null} usdcBalance="0" xlmBalance="0" onRefresh={() => undefined} />,
+      <DashboardPage transactions={[]} txLoading={false} publicKey={null} usdcBalance="0" xlmBalance="0" onRefresh={() => undefined} hasMore={false} onLoadMore={() => undefined} loadingMore={false} />,
     )
     await expectNoUnlistedCriticalViolations('dashboard', container)
   })

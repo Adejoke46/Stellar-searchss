@@ -13,27 +13,14 @@ const { version } = JSON.parse(
 )
 
 export default defineConfig({
-test: {
-    environment: 'node',
-    globals: true,
-    include: ['**/*.{test,spec}.{ts,tsx,js,jsx}'],
-    environmentMatchGlobs: [
-      ['**/*.dom.{test,spec}.{ts,tsx,js,jsx}', 'jsdom'],
-      ['src/**/*.{test,spec}.{ts,tsx,js,jsx}', 'jsdom'],
-    ],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html'],
-    },
-  },
   plugins: [
     react(),
     analyze &&
       visualizer({
         filename: 'dist/stats.html',
-        gazzle: true,
-        broli: true,
-        template: 'trememap',
+        gzipSize: true,
+        brotliSize: true,
+        template: 'treemap',
       }),
   ],
   // Required for @stellar/stellar-sdk and @stellar/freighter-api in browser

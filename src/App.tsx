@@ -3,7 +3,7 @@ import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 import { AnimatedBackground, Navbar, LiveTicker, Footer } from './components/layout'
 import { GroqAssistant }                       from './components/ai'
 import { useFreighterWallet, useSearch }       from './hooks'
-import { clearReceipts }                       from './lib/receipts'
+import { clearReceipts }                       from './lib/searchPrivacy'
 import { Toaster }                             from 'sonner'
 
 const SearchPage = lazy(() => import('./pages/SearchPage').then(m => ({ default: m.SearchPage })))
@@ -55,7 +55,7 @@ export default function App() {
   }, [])
 
   const {
-    wallet, transactions, txLoading,
+    wallet, transactions, txLoading, txHasMore, txLoadingMore, loadMoreTransactions,
     connect, disconnect, refresh,
   } = useFreighterWallet()
 
@@ -145,6 +145,9 @@ export default function App() {
                     usdcBalance={wallet.usdcBalance}
                     xlmBalance={wallet.xlmBalance}
                     onRefresh={refresh}
+                    hasMore={txHasMore}
+                    onLoadMore={() => loadMoreTransactions(wallet.publicKey ?? '')}
+                    loadingMore={txLoadingMore}
                   />
                 )}
               </motion.div>

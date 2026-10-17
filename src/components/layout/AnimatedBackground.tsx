@@ -68,7 +68,6 @@ export function AnimatedBackground() {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (prefersReducedMotion) return
 
-    let animId: number
     const matrixChars = '01ABCDEFx402USDC'.split('')
 
     const resize = () => {
@@ -104,7 +103,7 @@ export function AnimatedBackground() {
     let frame = 0
 
     const draw = () => {
-      if (!visible) { animId = requestAnimationFrame(draw); return }
+      if (!visible) { return }
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       frame++
 
@@ -209,7 +208,6 @@ const renderStatic = () => {
     }
 
     const handleChange = () => {
-      cancelAnimationFrame(animId)
       start()
     }
 
@@ -230,6 +228,7 @@ const renderStatic = () => {
     return () => {
       animationLoop.cleanup()
       window.removeEventListener('resize', resize)
+      removeMotionListener(handleChange)
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [])
