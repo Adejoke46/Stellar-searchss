@@ -5,6 +5,16 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
+## Table of Contents
+
+- [Demo](#demo)
+- [What it is](#what-it-is)
+- [Endpoints](#endpoints)
+- [Stack](#stack)
+- [Setup](#setup)
+- [Hackathon requirements](#hackathon-requirements)
+- [License](#license)
+
 ---
 
 ## Demo
@@ -86,6 +96,7 @@ For full endpoint parameters, response shapes, and error codes, see [`docs/api.m
 git clone https://github.com/StellarAgent-AI-Agent-Payment-Rails/Stellar-searchss.git
 cd Stellar-searchss
 npm install
+cp .env.example .env
 ```
 
 ### 2. Get your keys (all free)
@@ -102,15 +113,26 @@ No facilitator API key is required — `FACILITATOR_URL` defaults to the public
 ### 3. Configure
 
 ```bash
+# Skip this if you ran `npm run setup` — it already created .env
 cp .env.example .env
 # Fill in the keys above
 ```
+
+Then open `.env` and fill in the keys from step 2. Leave the remaining values at their defaults.
 
 ### 4. Install Freighter
 
 Install the [Freighter browser extension](https://freighter.app), create a testnet wallet, and fund it with USDC — see [Get testnet USDC](#get-testnet-usdc) below.
 
 ### 5. Run
+
+One command starts both processes:
+
+```bash
+npm run dev:all     # backend :3001 + frontend :5173, via concurrently
+```
+
+Or run them in separate terminals to see each log stream on its own:
 
 ```bash
 # Terminal 1 — backend
@@ -140,6 +162,11 @@ Default mode is **free** — it asserts request validation, `/health`, and that
 non-zero if any check fails:
 
 ```bash
+# The server answers even with no keys configured
+curl http://localhost:3001/health
+# → {"status":"ok","network":"stellar:testnet",...}
+
+# End-to-end check of the x402 gate (server must be running)
 npm run test:search "Stellar blockchain"
 ```
 
@@ -154,6 +181,111 @@ npm run test:search "Stellar blockchain" -- --paid
 
 Human-readable result listings appear only with `--verbose`; `--json` prints a
 machine-readable summary. See `scripts/test-search.ts -- --help`.
+
+---
+
+## Deployment (Vercel)
+
+StellarSearch deploys as a static Vite frontend plus the Vercel serverless
+functions in `api/`. `vercel.json` (committed) supplies the build command
+(`npm run build`), the output directory (`dist`), the install command, and the
+`/api/*` and SPA rewrites, so the dashboard build settings can stay at their
+defaults. No separate backend host is required.
+
+### 1. Import the project
+
+1. Push your fork to GitHub.
+2. In Vercel, **Add New → Project** and import the repository. Vercel detects the
+   Vite framework from `vercel.json`; leave the build and output settings as they
+   are.
+3. Add the environment variables below under **Settings → Environment
+   Variables** for the **Production** environment. Add **Preview** too if you
+   want working preview deployments.
+
+### 2. Environment variables
+
+`.env.production` is the committed reference for this list. Treat it as a
+template — set the real values in **Vercel → Settings → Environment Variables**,
+not in the file. Vercel does not load a committed `.env.production` for the
+serverless functions; only the `VITE_*` entries are read by Vite at build time,
+so keep those in sync with the values in your Vercel project (or delete them from
+your fork and set everything in Vercel).
+
+Variables prefixed `VITE_` are **build-time**: Vite inlines them into the static
+bundle, so changing one requires a redeploy. Every other variable is **runtime**:
+it is read per request by the `api/` functions. Redeploy after changing either
+kind so both the bundle and the functions pick up the new values.
+
+| Variable | Required | Build-time / runtime | Purpose | Example |
+|---|---|---|---|---|
+| `STELLAR_RECEIVING_ADDRESS` | **Yes** | Runtime | `payTo` account that receives 0.001 USDC for every paid query | `G…` (your funded testnet keypair) |
+| `SERPER_API_KEY` | **Yes** | Runtime | Serper.dev key backing `/api/search` | `your_serper_api_key_here` |
+| `GROQ_API_KEY` | **Yes** | Runtime | Groq key for `/api/ai/chat` and AI summaries | `gsk_…` |
+| `STELLAR_NETWORK` | No | Runtime | Network the functions settle on. Default `stellar:testnet` | `stellar:testnet` |
+| `FACILITATOR_URL` | No | Runtime | x402 facilitator that verifies and settles payments. Default `https://www.x402.org/facilitator` | `https://www.x402.org/facilitator` |
+| `VITE_STELLAR_NETWORK` | No | **Build-time** (`VITE_`) | Network inlined into the browser bundle. Keep it equal to `STELLAR_NETWORK` | `stellar:testnet` |
+| `VITE_SERVER_URL` | No | **Build-time** (`VITE_`) | API base the browser calls. Use the relative `/api` on Vercel | `/api` |
+| `PAYMENTS_DISABLED` | No | Runtime | Load-testing escape hatch for local runs only. Never set it in production | `true` |
+
+`NODE_ENV` and `VERCEL_ENV` are injected by Vercel and read by `api/search.ts` to
+keep the payment gate on in production — do not set them yourself.
+
+Missing a **Yes** variable degrades the feature rather than hiding it: without
+`SERPER_API_KEY` the paid search route returns an upstream error, without
+`GROQ_API_KEY` the AI chat fails, and without `STELLAR_RECEIVING_ADDRESS` the
+402 response has no `payTo` for the agent to pay.
+
+### 3. Deploy
+
+Deploy from the Vercel dashboard, or from the CLI:
+
+```bash
+npm run deploy        # npm run build && vercel --prod
+```
+
+### 4. Post-deploy verification checklist
+
+Replace `<your-app>` with your Vercel domain, then confirm each item:
+
+- [ ] `curl -s https://<your-app>.vercel.app/api/health` returns `200` with
+      `"status":"ok"`, a `network` matching your target, and
+      `receivingAddressConfigured`, `serperApiConfigured`, and
+      `groqApiConfigured` all `true`.
+- [ ] `curl -i "https://<your-app>.vercel.app/api/search?q=stellar"` returns
+      `402` with a `PAYMENT-REQUIRED` header — proof the x402 gate is active and
+      unpaid requests do not return results.
+- [ ] `curl -s -X POST https://<your-app>.vercel.app/api/ai/chat -H 'Content-Type: application/json' -d '{"messages":[{"role":"user","content":"Summarize x402"}]}'`
+      returns a JSON completion rather than a `500`.
+- [ ] The site loads and its network badge matches `STELLAR_NETWORK` /
+      `VITE_STELLAR_NETWORK`.
+- [ ] Connect Freighter on testnet, run a search, approve the Soroban auth
+      entry, and confirm results render with a `TX HASH` that opens a confirmed
+      transaction on [Stellar Expert testnet](https://stellar.expert/explorer/testnet).
+- [ ] `/api/health`'s `facilitator` value equals `FACILITATOR_URL`.
+- [ ] The browser Network tab / page source contains **no** value of
+      `STELLAR_RECEIVING_ADDRESS`, `SERPER_API_KEY`, or `GROQ_API_KEY` (only
+      `VITE_*` values may appear in the bundle).
+
+To move the deployment to mainnet, work through [`docs/mainnet.md`](docs/mainnet.md)
+before changing `STELLAR_NETWORK`.
+
+### Other runtimes (optional)
+
+These are not needed for the Vercel frontend + `api/` deployment, but the MCP
+server, the self-hosted Express server, and the CLI tests read them:
+
+| Variable | Required | Used by | Purpose | Example |
+|---|---|---|---|---|
+| `SEARCH_API_URL` | No | MCP server, CLI tests | Absolute API base the MCP search/stats tools call. Must include `/api` on Vercel. Default `http://localhost:3001` | `https://your-app.vercel.app/api` |
+| `ALLOWED_ORIGINS` | No | Express server (self-host) | Comma-separated browser origins allowed when `NODE_ENV=production` | `https://your-app.vercel.app` |
+| `PORT` | No | Express server (self-host) | Port for `npm run server`. Default `3001` | `3001` |
+| `DEBUG_BANNER` | No | Express server (self-host) | `1` prints the full receiving address in the startup banner | `1` |
+| `STELLAR_PAYER_SECRET` | No | CLI paid test | Testnet secret used by `npm run test:search -- --paid` | `S…` |
+| `SOROBAN_RPC_URL` | No | CLI paid test | Soroban RPC endpoint for the paid test. Default `https://soroban-testnet.stellar.org` | `https://soroban-testnet.stellar.org` |
+
+`.env.example` also carries two optional placeholders for an external serverless
+stats store. No code currently reads them, so they are not required and are
+omitted from the tables above; set them only if you later wire that store up.
 
 ---
 
@@ -241,12 +373,17 @@ Claude Code / any MCP client
 6. Server receives confirmation and forwards the query to Serper.dev
 7. Results are returned with the `txHash` from the `X-Payment-Response` header
 
-The MCP server sits in front of the same Express routes, so an agent using Claude Code
-pays through the identical x402 flow.
+The MCP server forwards calls to the same Express routes, but it does **not**
+configure an x402 payer/signer, so it cannot settle a payment itself. A paid tool
+returns results only when the StellarSearch API settles the request, and it reports
+a payment only when the response carries a confirmed settlement transaction (a
+`txHash`); otherwise the tool output says the payment was not confirmed.
 
-## Search history and privacy
-
-Successful paid searches keep a receipt in the current browser’s localStorage with the transaction hash, amount, timestamp, and network. Query text is **not stored by default**. To opt in, enable **Save search query text in this browser** in the Dashboard. Turning it off removes query text from existing receipts, while keeping payment metadata. Use **Clear receipts** in the Dashboard to delete all locally stored receipts. The app keeps at most the 50 most recent receipts; clearing browser site data also removes them.
+> **Security:** payment *is* authentication in this project — there are no accounts, sessions, or API
+> keys, so the security of the payment flow is the security of the product. The trust boundaries
+> between client, server, facilitator, and the Stellar network are documented in the
+> **[payment flow threat model](docs/threat-model.md)**, which also enumerates the known attacks and
+> mitigations. See [`SECURITY.md`](SECURITY.md) for the security policy and reporting process.
 
 ---
 
@@ -287,39 +424,73 @@ stellar-search/
 │   │   ├── DocsPage.tsx
 │   │   └── DashboardPage.tsx           # Live Horizon tx history
 │   └── types/index.ts
-├── server/                             # Express + x402 backend (npm run server)
-│   ├── index.ts                        # /search, /images, /news, /ai/chat, /health
-│   ├── corsConfig.ts                   # CORS allow-list from env
+├── server/
+│   ├── handlers.ts                     # Shared framework-free /search, /health, /ai/chat logic
+│   ├── app.ts                          # Express app factory (createApp)
+│   ├── index.ts                        # Starts the Express app (npm run server)
+│   ├── corsConfig.ts                   # CORS allow-list from env (single source for both targets)
 │   └── logger.ts                       # Winston payment logging
-├── api/                                # Vercel serverless mirror of the paid routes
+├── api/                                # Vercel serverless functions (thin adapters)
 │   ├── index.ts                        # Service metadata
-│   ├── search.ts                       # GET /api/search — x402 protected
-│   ├── health.ts                       # GET /api/health
-│   └── ai/chat.ts                      # POST /api/ai/chat — Groq
+│   ├── search.ts                       # GET /api/search — calls server/handlers.ts
+│   ├── health.ts                       # GET /api/health — calls server/handlers.ts
+│   └── ai/chat.ts                      # POST /api/ai/chat — calls server/handlers.ts
 ├── mcp-server/
 │   └── index.ts                        # MCP tools (see below)
 ├── scripts/
-│   ├── setup.sh                        # One-shot env setup
-│   └── test-search.ts                  # End-to-end x402 test script
-├── public/favicon.svg
+│   └── test-search.ts          # End-to-end test script
+├── docs/
+│   └── threat-model.md         # Payment flow trust boundaries and attack analysis
 ├── .env.example
 ├── vercel.json                 # Committed build + routing config
 ├── claude_mcp.json
+├── SECURITY.md
 └── README.md
 ```
 
+### Single source of truth for the API
+
+`server/handlers.ts` holds the framework-free implementations of `/search`,
+`/health` and `/ai/chat`. Handlers take already-parsed inputs and return a
+plain `{ status, headers, body }` result — they never see an Express `Request`
+or a Vercel `VercelRequest`.
+
+Both deployment targets are thin adapters over that module:
+
+- `server/app.ts` wires the handlers into the Express routes (and keeps the
+  Express-only `/images`, `/news`, `/summarize-url` and `/receipts` routes).
+- `api/search.ts`, `api/health.ts` and `api/ai/chat.ts` adapt Vercel's
+  req/res to the same handlers.
+
+Validation, search execution, Groq suggestions, the x402 payment-required
+challenge, the SSE framing and the health payload/ETag therefore exist in
+exactly one place. CORS comes from `server/corsConfig.ts`: Express uses
+`buildCorsOptions()` and the serverless functions use `buildCorsHeaders()`,
+both derived from the same constant allow-list.
+
+`tests/parity.test.ts` boots the Express app and invokes the Vercel handlers
+with the same inputs, asserting identical `{ status, body }` (Serper and Groq
+are mocked by MSW). Run it with `npm run test:parity`.
+
 ### MCP tools
 
-`mcp-server/index.ts` exposes six tools to any MCP client:
+`mcp-server/index.ts` exposes these tools to any MCP client:
 
-| Tool | Backing route | Price |
+| Tool | Backing route | Upstream price |
 |---|---|---|
 | `web_search` | `GET /search` | 0.001 USDC |
 | `image_search` | `GET /images` | 0.001 USDC |
 | `news_search` | `GET /news` | 0.001 USDC |
 | `ai_summarize` | Groq API directly | Free |
+| `summarize_url` | `POST /summarize-url` | Free |
 | `check_balance` | Stellar Horizon REST | Free |
 | `get_search_stats` | `GET /health` | Free |
+| `list_receipts` | `GET /receipts` | Free |
+
+The three paid tools call x402-priced routes, but the MCP server itself does not
+configure a payment signer, so it does not pay on the caller's behalf. It reports
+a payment only when the upstream response includes a confirmed settlement
+transaction; otherwise the tool output states that the payment was not confirmed.
 
 ---
 
@@ -338,7 +509,7 @@ The MCP server reads these environment variables:
 
 The local entry expects the API server to be running on port 3001. The hosted entry connects to the deployed API and does not require a local API server. Both still require a Groq key for the MCP process to start.
 
-Then tell Claude Code: `"Search for the latest Stellar x402 examples"` — it calls `web_search`, the server pays via x402, and Claude gets real results.
+Then tell Claude Code: `"Search for the latest Stellar x402 examples"` — it calls `web_search`; results come back when the StellarSearch API settles the x402 payment.
 
 ### `summarize_url` (free)
 
@@ -398,7 +569,7 @@ Server stats are reference data, so they fit the resource model better than a to
 }
 ```
 
-Then tell Claude Code: `"Search for the latest Stellar x402 examples"` — it calls `web_search`, the server pays via x402, and Claude gets real results. The same client can call `image_search` and `news_search` for visual and current-events lookups.
+Then tell Claude Code: `"Search for the latest Stellar x402 examples"` — it calls `web_search`; results come back when the StellarSearch API settles the x402 payment. The same client can call `image_search` and `news_search` for visual and current-events lookups.
 
 ---
 
