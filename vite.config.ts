@@ -18,9 +18,9 @@ export default defineConfig({
     analyze &&
       visualizer({
         filename: 'dist/stats.html',
-        gazzle: true,
-        broli: true,
-        template: 'trememap',
+        gzipSize: true,
+        brotliSize: true,
+        template: 'treemap',
       }),
   ],
   // Required for @stellar/stellar-sdk and @stellar/freighter-api in browser
@@ -44,26 +44,21 @@ export default defineConfig({
     },
   },
   build: {
-    // Split large vendor libs into their own chunks so the landing bundle
-    // doesn't pay for them on first paint and they can be cached independently.
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
+        manualChunks(id) {
           if (!id) return
-          if (id.includes('node_modules')) {
-            if (id.match(/[\\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/)) {
-              return 'vendor-react'
-            }
-            if (id.includes('node_modules/framer-motion')) {
-              return 'vendor-framer-motion'
-            }
-            if (id.includes('node_modules/lucide-react')) {
-              return 'vendor-lucide'
-            }
-            if (id.includes('node_modules/@stellar')) {
-              return 'vendor-stellar'
-            }
-            return 'vendor'
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+            return 'vendor-charts'
+          }
+          if (id.includes('node_modules/@stellar')) {
+            return 'vendor-stellar'
+          }
+          if (id.includes('node_modules/framer-motion')) {
+            return 'vendor-framer-motion'
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-lucide'
           }
         },
       },

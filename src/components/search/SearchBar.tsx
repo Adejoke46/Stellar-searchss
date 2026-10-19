@@ -22,6 +22,32 @@ export function SearchBar({
 
   useEffect(() => {
     inputRef.current?.focus()
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const input = inputRef.current
+      if (!input || input.disabled || event.defaultPrevented || event.isComposing) return
+
+      const isSlash = event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey
+      const isCommandK = event.key.toLowerCase() === 'k'
+        && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+      if (!isSlash && !isCommandK) return
+
+      const activeElement = document.activeElement
+      if (activeElement !== input && activeElement instanceof HTMLElement
+        && (activeElement.matches('input, textarea, select') || activeElement.isContentEditable)) {
+        return
+      }
+
+      // Keep slash available for queries containing URLs or paths.
+      if (isSlash && activeElement === input) return
+
+      event.preventDefault()
+      input.focus()
+      input.select()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -77,12 +103,19 @@ export function SearchBar({
             name="q"
             type="text"
             aria-label="Search query"
+            aria-keyshortcuts="/ Control+K Meta+K"
             defaultValue={defaultQuery}
             placeholder={isWrongNetwork ? 'Switch network to search...' : "Search anything — pay per query, not per month..."}
             disabled={isSearching || isWrongNetwork}
-            className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/20 text-sm rounded-md disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00f5ff]"
+            className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/60 text-sm rounded-md disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00f5ff]"
             style={{ caretColor: isWrongNetwork ? '#ef4444' : '#00f5ff' }}
           />
+
+          {!isWrongNetwork && (
+            <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] text-white/60 font-mono select-none pointer-events-none">
+              <span>/</span>
+            </div>
+          )}
 
           <motion.button
             type="submit"
@@ -92,7 +125,7 @@ export function SearchBar({
               background: isSearching || isWrongNetwork ? 'transparent' : 'rgba(0,245,255,0.12)',
               border: '1px solid',
               borderColor: isSearching || isWrongNetwork ? 'rgba(255,255,255,0.1)' : 'rgba(0,245,255,0.4)',
-              color: isSearching || isWrongNetwork ? 'rgba(255,255,255,0.3)' : '#00f5ff',
+              color: isSearching || isWrongNetwork ? 'rgba(255,255,255,0.6)' : '#00f5ff',
             }}
             whileTap={{ scale: 0.96 }}
           >
@@ -111,15 +144,19 @@ export function SearchBar({
 
       {/* Meta row */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-2 px-1">
-        <p className="font-display text-xs text-white/20">
+        <p className="font-display text-xs text-white/60">
           {walletConnected
             ? `Balance: ${usdcBalance} USDC · ~${Math.floor(parseFloat(usdcBalance) / parseFloat(AMOUNT_USDC)).toLocaleString()} queries left`
             : 'Connect Freighter wallet to search'}
         </p>
-        <p className="font-display text-xs text-white/20 uppercase tracking-widest">
+        <p className="font-display text-xs text-white/60 uppercase tracking-widest">
           Serper.dev · x402 · Stellar {IS_MAINNET ? 'Mainnet' : 'Testnet'}
         </p>
       </div>
+
+      <p className="mt-2 px-1 text-xs text-white/50">
+        Press <kbd className="font-mono">/</kbd> or <kbd className="font-mono">Ctrl/Cmd + K</kbd> to focus search
+      </p>
     </form>
   )
 }
