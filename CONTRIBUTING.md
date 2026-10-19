@@ -15,8 +15,9 @@ Everything after this section is reference material for when you need it.
 ### 1. Clone and install (~4 min)
 
 ```bash
-git clone https://github.com/<your-username>/Stellar-Search.git
-cd Stellar-Search
+# Fork the repo on GitHub first, then clone your fork:
+git clone https://github.com/<your-username>/Stellar-searchss.git
+cd Stellar-searchss        # note: the directory is Stellar-searchss, not stellar-search
 npm install          # Node 18+ and npm 9+ required
 ```
 
@@ -58,7 +59,7 @@ src/pages/DocsPage.tsx             # fix wording in the docs copy
 That is a real, PR-able contribution. Confirm it still typechecks before opening a PR:
 
 ```bash
-npx tsc --noEmit
+npm run typecheck
 ```
 
 ### 5. What you can (and cannot) do without a wallet
@@ -66,16 +67,17 @@ npx tsc --noEmit
 | ✅ Works with no wallet | ⛔ Needs Freighter + funded testnet USDC |
 |---|---|
 | Everything in `src/` — pages, components, hooks, styling, copy, layout | `/search` (the 0.001 USDC paid route) and anything that calls it |
-| `npm run dev`, `npm run build`, `npx tsc --noEmit` | `src/hooks/useSearch.ts`, `src/hooks/useFreighterWallet.ts`, `src/components/wallet/WalletPanel.tsx` |
-| `GET /health` and `GET /ai/chat` on the backend | `src/pages/DashboardPage.tsx` (reads live Horizon tx history) |
-| Docs, README, CONTRIBUTING, issue triage, tests | `npm run test:search`, MCP payment tools |
+| `npm run setup`, `npm run dev`, `npm run build`, `npm run typecheck` | `src/hooks/useSearch.ts`, `src/hooks/useFreighterWallet.ts`, `src/components/wallet/WalletPanel.tsx` |
+| `npm run test:search` — it signs no payment, it asserts the `402` | MCP tools — `web_search` pays via x402 |
+| `GET /health`, `GET /ai/chat`, docs, README, CONTRIBUTING, issue triage | `src/pages/DashboardPage.tsx` (reads live Horizon tx history) |
 
 If your change never touches the payment flow, you never need to install Freighter or create a Stellar account. The full wallet walkthrough is in [Local Development Setup](#local-development-setup).
 
 ### 6. Find something to work on
 
-- **[Good first issues](https://github.com/Emmy123222/Stellar-Search/issues?q=is%3Aopen+label%3A%22good+first+issue%22)** — scoped, self-contained, with clear acceptance criteria.
-- [All open issues](https://github.com/Emmy123222/Stellar-Search/issues) — the backlog has 50+ scoped ideas.
+- **[Good first issues](https://github.com/StellarAgent-AI-Agent-Payment-Rails/Stellar-searchss/issues?q=is%3Aopen+label%3A%22good+first+issue%22)** — scoped, self-contained, with clear acceptance criteria.
+- [All open issues](https://github.com/StellarAgent-AI-Agent-Payment-Rails/Stellar-searchss/issues) — the backlog has 50+ scoped ideas.
+- New to Stellar or x402? Start with the [Stellar and x402 glossary](docs/glossary.md).
 - Comment _"I'd like to work on this"_ on the issue before you start, so two people do not build the same thing.
 
 Then branch, commit and open a PR — the conventions are in [Development Workflow](#development-workflow) and [Submitting a Pull Request](#submitting-a-pull-request).
@@ -97,6 +99,7 @@ Then branch, commit and open a PR — the conventions are in [Development Workfl
 11. [Testing](#testing)
 12. [Common Pitfalls](#common-pitfalls)
 13. [Getting Help](#getting-help)
+14. [Changelog & Releases](#changelog--releases)
 
 ---
 
@@ -237,7 +240,7 @@ Open `http://localhost:5173` in your browser.
 # Health check — should return { "status": "ok", ... }
 curl http://localhost:3001/health | jq .
 
-# Optional: end-to-end payment test (requires .env with all keys set)
+# Checks the x402 gate on /search (needs the server running, no wallet needed)
 npm run test:search "Stellar blockchain"
 ```
 
@@ -246,7 +249,7 @@ npm run test:search "Stellar blockchain"
 ## Project Structure
 
 ```
-stellar-search/
+Stellar-searchss/
 │
 ├── src/                        # React 18 frontend (TypeScript)
 │   ├── components/
@@ -279,6 +282,7 @@ stellar-search/
 │   └── index.ts                # MCP tools: web_search, ai_summarize, check_balance
 │
 ├── scripts/
+│   ├── setup.sh                # Backs `npm run setup`
 │   └── test-search.ts          # End-to-end CLI test
 │
 ├── .env.example                # Template — copy to .env
@@ -326,7 +330,7 @@ git checkout -b fix/freighter-rejection-loop
 
 - Keep changes focused — one concern per PR.
 - Follow the [coding standards](#coding-standards) below.
-- Run the typecheck frequently: `npx tsc --noEmit`.
+- Run the typecheck frequently: `npm run typecheck`.
 
 ### Commit messages
 
@@ -342,19 +346,18 @@ Use the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
+The scope is optional, so both `fix: ...` and `fix(search): ...` are valid. A
+commit-msg hook checks this format when you commit. The subject may use normal
+punctuation or capitalization; focus on the type and a clear summary.
+
 **Examples:**
 
 ```
-fix(wallet): catch Freighter rejection and set session to error state
-
-Closes #1
+fix: keep search errors visible and retryable
 ```
 
 ```
-feat(search): add localStorage search history with 20-entry limit
-
-Stores { query, timestamp, txHash } entries.
-Closes #9
+feat(ui): prominent persistent network badge + mainnet page indicator (#93)
 ```
 
 ```
@@ -379,7 +382,7 @@ docs: add CONTRIBUTING.md
    - **Screenshots** — required for any UI change.
 
 4. Make sure:
-   - [ ] `npx tsc --noEmit` passes with no errors.
+   - [ ] `npm run typecheck` passes with no errors.
    - [ ] The app starts and the affected feature works manually.
    - [ ] No new `console.log` / debug statements left in.
    - [ ] No secrets or `.env` values committed.
@@ -476,7 +479,15 @@ const signedAuthEntry = Buffer.from(raw as unknown as Uint8Array).toString('base
 
 ## Testing
 
-Currently the project relies on manual testing. We are actively adding automated tests — see the open [testing issues](https://github.com/StellarAgent-AI-Agent-Payment-Rails/Stellar-searchss/issues?q=is%3Aopen+label%3Atesting). If you are adding a new hook or server route, please include tests.
+The frontend uses Vitest, React Testing Library, and jsdom for component tests. See the open [testing issues](https://github.com/StellarAgent-AI-Agent-Payment-Rails/Stellar-searchss/issues?q=is%3Aopen+label%3Atesting) for areas that still need coverage. If you add a hook, component, or server route, include focused tests where practical.
+
+### Component-test conventions
+
+- Put tests next to the component as `<Component>.test.tsx`.
+- Render with React Testing Library and query by accessible role or label before using test IDs.
+- Test user-visible behavior (including guards and empty/loading states), not implementation details.
+- Mock network, wallet, and toast boundaries; do not make payment calls from unit tests.
+- Run `npm test` for a one-shot Vitest run or `npm run test:watch` while developing.
 
 ### Manual testing checklist
 
@@ -495,17 +506,23 @@ For UI changes:
 - [ ] No horizontal scroll at any breakpoint.
 - [ ] Light and dark mode look acceptable (if theme toggle exists).
 
-### Running the TypeScript compiler
+### Running the typecheck
 
 ```bash
-# Check all TypeScript errors (does not emit files)
-npx tsc --noEmit
+# Check all TypeScript errors across the app, server, MCP server and
+# scripts (does not emit files). CI runs this on every PR.
+npm run typecheck
 ```
+
+This checks all three TypeScript projects: `tsconfig.json` (app),
+`tsconfig.server.json` (server, MCP server, scripts) and
+`tsconfig.node.json` (`vite.config.ts`). A type error in any of them
+fails CI.
 
 ### End-to-end test script
 
 ```bash
-# Requires all .env keys to be set and server running
+# Server must be running. Signs no payment — without a wallet it just reports the 402
 npm run test:search "Stellar blockchain"
 ```
 
@@ -538,6 +555,41 @@ npm run test:search "Stellar blockchain"
 | Account not found | Account not funded on testnet | Fund it at Stellar Lab |
 | USDC balance always 0 | Wrong USDC issuer address | Use `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5` for testnet |
 | Transactions not loading | Horizon rate-limit | Add a 500ms delay between calls; use pagination |
+
+---
+
+## Changelog & Releases
+
+Every notable change to StellarSearch is recorded in [`CHANGELOG.md`](./CHANGELOG.md), which follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+### When to update the changelog
+
+If your PR changes behaviour that a deployer or user would care about, add an entry under the `## [Unreleased]` section of `CHANGELOG.md` in the same PR. Use the appropriate subsection:
+
+| Subsection | Use for |
+|---|---|
+| `Added` | New features, new env vars, new endpoints |
+| `Changed` | Behaviour changes to existing features |
+| `Deprecated` | Features that will be removed in a future release |
+| `Removed` | Features removed in this release |
+| `Fixed` | Bug fixes |
+| `Security` | Vulnerability fixes |
+
+Docs-only, test-only, and internal refactor PRs do not require a changelog entry.
+
+### Release process
+
+Maintainers cut releases as follows:
+
+1. Move entries from `## [Unreleased]` into a new `## [x.y.z] - YYYY-MM-DD` section.
+2. Update the comparison links at the bottom of `CHANGELOG.md`.
+3. Bump the version in `package.json` to match.
+4. Tag the commit (`git tag vX.Y.Z`) and push the tag.
+5. Publish the GitHub Release using the new changelog section as the release notes.
+
+### Automating from conventional commits
+
+Because all commits follow [Conventional Commits](#commit-messages), the changelog can be generated automatically. A future PR will wire up a tool such as [`git-cliff`](https://git-cliff.org) or [`conventional-changelog`](https://github.com/conventional-changelog/conventional-changelog) to produce entries from commit history. Until then, update `CHANGELOG.md` by hand — the commit types (`feat`, `fix`, `docs`, etc.) map directly onto the changelog subsections above.
 
 ---
 

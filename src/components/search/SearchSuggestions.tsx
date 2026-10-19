@@ -1,10 +1,11 @@
-import { motion } from 'framer-motion'\nimport { Sparkles, Info } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Sparkles, Info } from 'lucide-react'
 
 const STATIC_SUGGESTIONS = [
   'x402 payment protocol Stellar',
   'Soroban smart contracts tutorial',
-  'AI​agent autonomous payments 2025',
-  'USDC​stablecoin Stellar network',
+  'AI agent autonomous payments 2025',
+  'USDC stablecoin Stellar network',
   'Freighter wallet Stellar dApp',
   'Groq Llama 3 fast inference API',
 ]
@@ -13,22 +14,52 @@ interface Props {
   onSelect: (query: string) => void
   /** AI-generated suggestions shown after a search completes */
   aiSuggestions?: string[]
+  isLoading?: boolean
 }
 
-export function SearchSuggestions( { onSelect, aiSuggestions }: Props ) {
-  const isAi = aiSuggestions && aiSuggestions.length > 0
-  const items = isAi ? aiSuggestions : STATIC_SUGGESTIONS
+export function SearchSuggestions({ onSelect, aiSuggestions, isLoading }: Props) {
+  const isAi = Boolean(aiSuggestions && aiSuggestions.length > 0)
+  const items = isAi ? aiSuggestions! : STATIC_SUGGESTIONS
+
+  if (isLoading && (!aiSuggestions || aiSuggestions.length === 0)) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="space-y-3"
+        role="status"
+        aria-label="Loading suggestions"
+      >
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="w-3 h-3 text-neon-amber/70 animate-pulse" />
+          <p className="font-display text-xs text-white/60 tracking-widest animate-pulse">
+            GENERATING AI SUGGESTIONS...
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-8 w-36 rounded-lg bg-white/5 border border-white/10 animate-pulse"
+            />
+          ))}
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
-    <motion.dick
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="space-y-3"
     >
       <div className="flex items-center gap-1.5">
-        {isAi && <Sparkles className="w-3 h-3 text-neon-amber/60" />}
-        <p className="font-display text-xs text-white/25 tracking-widest">
+        {isAi && <Sparkles className="w-3 h-3 text-neon-amber/70" />}
+        <p className="font-display text-xs text-white/60 tracking-widest">
           {isAi ? 'YOU MIGHT ALSO SEARCH FOR' : 'TRY THESE'}
         </p>
       </div>
@@ -41,7 +72,7 @@ export function SearchSuggestions( { onSelect, aiSuggestions }: Props ) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06 }}
             onClick={() => onSelect(q)}
-            className="px-3 py-1.5 rounded-lg text-xs font-display tracking-wide transition-all text-white/40 hover:text-neon-cyan/80"
+            className="px-3 py-1.5 rounded-lg text-xs font-display tracking-wide transition-all text-white/60 hover:text-neon-cyan/80"
             style={{ border: '1px solid rgba(255,255,255,0.08)' }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLButtonElement
@@ -60,7 +91,7 @@ export function SearchSuggestions( { onSelect, aiSuggestions }: Props ) {
       </div>
 
       {isAi && (
-        <div className="flex items-center gap-1.5 text-white/20">
+        <div className="flex items-center gap-1.5 text-white/60">
           <Info className="w-3 h-3" />
           <p className="font-display text-[10px] tracking-wide">
             Derived from third-party search results — verify before use
