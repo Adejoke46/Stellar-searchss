@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react'
 import { IS_MAINNET, AMOUNT_USDC } from '../../lib/stellar'
 
 interface Props {
@@ -15,16 +16,16 @@ const getTickerItems = () => [
 ]
 
 function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
 
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     const update = () => setPrefersReducedMotion(!mediaQuery.matches)
 
     update()
-    mediaQuery.addEventListener?'.change', update)
+    mediaQuery.addEventListener?.('change', update)
     return () => mediaQuery.removeEventListener?.('change', update)
   }, [])
 
@@ -51,10 +52,10 @@ export function LiveTicker({ walletConnected }: Props) {
         className={`flex items-center gap-8 whitespace-nowrap ${prefersReducedMotion ? '' : 'animate-ticker'}`}
         style={{ width: prefersReducedMotion ? 'auto' : 'max-content' }}
       >
-        {doubled.map(([i, v], i) => (
-          <div key={i} className="inline-flex items-center gap-2 px-6">
+        {doubled.map(([k, v], idx) => (
+          <div key={idx} className="inline-flex items-center px-6">
             <span
-              className="font-display text-neon-cyan/30 tracking-widest"
+              className="font-display text-neon-cyan/70 tracking-widest"
               style={{ fontSize: '10px' }}
             >
               {k}
@@ -65,7 +66,7 @@ export function LiveTicker({ walletConnected }: Props) {
             >
               {v}
             </span>
-            <span className="text-neon-cyan/15">↗</span>
+            <span className="text-neon-cyan/70">↗</span>
           </div>
         ))}
       </div>

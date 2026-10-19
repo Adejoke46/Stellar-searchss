@@ -4,7 +4,7 @@
  * Fetches live balances from Stellar Horizon
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   isConnected,
   requestAccess,
@@ -12,7 +12,8 @@ import {
   getNetwork,
 } from '@stellar/freighter-api'
 import { Horizon } from '@stellar/stellar-sdk'
-import { HORIZON_URL, USDC_ISSUER } from '../lib/stellar'
+import { toast } from 'sonner'
+import { getHorizonUrl, USDC_ISSUER } from '../lib/stellar'
 
 export interface WalletState {
   publicKey: string | null
@@ -20,9 +21,16 @@ export interface WalletState {
   network: string
   xlmBalance: string
   usdcBalance: string
+  /**
+   * Whether the account holds a trustline for the configured USDC issuer.
+   * `null` means the trustline state has not been determined yet
+   * (e.g. before the first balance fetch completes).
+   */
+  usdcTrustline: boolean | null
   loading: boolean
   refreshing: boolean
   error: string | null
+fundingRequired: boolean
   hint: string | null
 }
 
@@ -38,9 +46,50 @@ export interface StellarTransaction {
   memo?: string
 }
 
+export interface SearchSession {
+  query: string
+  results: any[]
+}
+
+export interface Receipt {
+  id: string
+  txHash: string
+  amount: string
+  asset: string
+  timestamp: string
+  memo?: string
+}
+
+export const RECEIPTS_STORAGE_KEY = 'stellar-receipts'
+
 export const DEFAULT_TX_PAGE_SIZE = 15
 
-export const horizon = new Horizon.Server(HORIZON_URL)
+function loadReceipts(): Receipt[] {
+  try {
+    const raw = localStorage.getItem(RECEIPTS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveReceipts(receipts: Receipt[]) {
+  try {
+    localStorage.setItem(RECEIPTS_STORAGE_KEY, JSON.stringify(receipts))
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+function clearReceipts() {
+  try {
+    localStorage.removeItem(RECEIPTS_STORAGE_KEY)
+  } catch {
+    // localStorage unavailable
+  }
+}
 
 const MAX_RETRIES = 4
 const BASE_DELAY_MS = 1000
@@ -103,6 +152,16 @@ function mapOperation(op: any): StellarTransaction {
     memo: op.transaction?.memo,
   }
 }
+
+const FUNDING_ERROR = 'This account is not funded yet'
+
+function isHorizon404(err: any): boolean {
+  if (!err) return false
+  if (err.response?.status === 404) return true
+  if (err.status === 404) return true
+  const message = String(err.message || '')
+  return /404/.test(message) || /not found/i.test(message)
+}
 export function useFreighterWallet() {
   const [wallet, setWallet] = useState<WalletState>({
     publicKey: null,
@@ -110,40 +169,57 @@ export function useFreighterWallet() {
     network: 'TESTNET',
     xlmBalance: '0',
     usdcBalance: '0',
+    usdcTrustline: null,
     loading: false,
     refreshing: false,
     error: null,
+fundingRequired: false,
     hint: null,
   })
+  // Horizon client keyed on the active network.
+  // Stored in a ref so callbacks always read the current instance without
+  // needing to be recreated on every network change.
+  const horizonRef = useRef<Horizon.Server>(
+    new Horizon.Server(getHorizonUrl(wallet.network))
+  )
+
   const [transactions, setTransactions] = useState<StellarTransaction[]>([])
   const [txLoading, setTxLoading] = useState(false)
+const [receipts, setReceipts] = useState<Receipt[]>(loadReceipts)
+  const [searchSession, setSearchSession] = useState<SearchSession | null>(null)
   const [txLoadingMore, setTxLoadingMore] = useState(false)
   const [txCursor, setTxCursor] = useState<string | null>(null)
   const [txHasMore, setTxHasMore] = useState(false)
   const [transactionError, setTransactionError] = useState<string | null>(null)
 
   // Fetch real balances from Horizon
-  const fetchBalances = useCallback(async (publicKey: string) => {
+  const fetchBalances = useCallback(async (publicKey: string, fetchId?: number) => {
     try {
       const cached = balanceCache.get(publicKey)
       if (cached && Date.now() - cached.ts < BALANCE_CACHE_TTL_MS) {
         return
       }
 
-      const account = await withBackoff(() => horizon.loadAccount(publicKey))
+      const account = await withBackoff(() => horizonRef.current.loadAccount(publicKey))
 
       let xlm = '0'
       let usdc = '0'
+      // Distinguish "no trustline" from "trustline with zero balance".
+      // Without a trustline the account cannot receive USDC at all.
+      let hasUsddTrustline = false
 
       for (const balance of account.balances) {
         if (balance.asset_type === 'native') {
           xlm = parseFloat(balance.balance).toFixed(4)
         } else if (
-          balance.asset_type === 'credit_alphanum4' &&
-          (balance as any).asset_code === 'USDC' &&
-          (balance as any).asset_issuer === USDC_ISSUER
+          balance.asset_type === 'credit_alphanum4' ||
+          balance.asset_type === 'credit_alphanum12'
         ) {
-          usdc = parseFloat(balance.balance).toFixed(6)
+          const credit = balance as any
+          if (credit.asset_code === 'USDC' && credit.asset_issuer === USDC_ISSUER) {
+            hasUsddTrustline = true
+            usdc = parseFloat(credit.balance).toFixed(6)
+          }
         }
       }
 
@@ -153,9 +229,22 @@ export function useFreighterWallet() {
         ...prev,
         xlmBalance: xlm,
         usdcBalance: usdc,
+        usddTrustline: hasUsddTrustline,
         error: null,
+        fundingRequired: false,
       }))
     } catch (err: any) {
+console.error('Failed to load account from Horizon:', err)
+      if (isHorizon404(err)) {
+        setWallet(prev => ({
+          ...prev,
+          xlmBalance: '0',
+          usdcBalance: '0',
+          error: FUNDING_ERROR,
+          fundingRequired: true,
+        }))
+        return
+      }
       if (isRateLimitError(err)) {
         setWallet(prev => ({
           ...prev,
@@ -166,6 +255,7 @@ export function useFreighterWallet() {
       setWallet(prev => ({
         ...prev,
         error: err.message || 'Failed to load account',
+        fundingRequired: false,
       }))
     }
   }, [])
@@ -177,7 +267,7 @@ export function useFreighterWallet() {
       setTransactionError(null)
       try {
         const ops = await withBackoff(() =>
-          horizon
+          horizonRef.current
             .operations()
             .forAccount(publicKey)
             .order('desc')
@@ -212,7 +302,7 @@ export function useFreighterWallet() {
       }
       setTxLoadingMore(true)
       try {
-        const ops = await horizon
+        const ops = await horizonRef.current
           .operations()
           .forAccount(publicKey)
           .order('desc')
@@ -248,9 +338,15 @@ export function useFreighterWallet() {
     [txCursor, txHasMore, txLoadingMore]
   )
 
+  // Run both Horizon fetches concurrently. Use allSettled so a
+  // failure in one does not discard the other's result.
+  const fetchWalletData = useCallback(async (publicKey: string) => {
+    await Promise.allSettled([fetchBalances(publicKey), fetchTransactions(publicKey)])
+  }, [fetchBalances, fetchTransactions])
+
   // Connect Freighter wallet
   const connect = useCallback(async () => {
-    setWallet(prev => ({ ...prev, loading: true, error: null, hint: null }))
+setWallet(prev => ({ ...prev, loading: true, error: null, fundingRequired: false, hint: null }))
 
     try {
       const connected = await isConnected()
@@ -280,57 +376,113 @@ export function useFreighterWallet() {
         network,
         loading: false,
         error: null,
+        fundingRequired: false,
       }))
 
-      // Fetch live data after connect
-      await fetchBalances(addressResult.address)
-      await fetchTransactions(addressResult.address)
+      // Fetch live data after connect (balances + transactions in parallel)
+      await fetchWalletData(addressResult.address)
     } catch (err: any) {
       setWallet(prev => ({
         ...prev,
         loading: false,
         connected: false,
         error: err.message || 'Connection failed',
-        hint: err.message || 'Connection failed. Please check Freighter and try again.',
+hint: err.message || 'Connection failed. Please check Freighter and try again.',
+        fundingRequired: false,
       }))
     }
-  }, [fetchBalances, fetchTransactions])
+  }, [fetchWalletData])
 
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback((clearStoredReceipts = false) => {
     setWallet({
       publicKey: null,
       connected: false,
       network: 'TESTNET',
       xlmBalance: '0',
       usdcBalance: '0',
+      usdcTrustline: null,
       loading: false,
       refreshing: false,
       error: null,
+fundingRequired: false,
       hint: null,
     })
     setTransactions([])
+setSearchSession(null)
     setTxCursor(null)
     setTxHasMore(false)
+    if (clearStoredReceipts) {
+      clearReceipts()
+      setReceipts([])
+    }
+  }, [])
+
+  const addReceipt = useCallback((receipt: Receipt) => {
+    setReceipts(prev => {
+      const next = [receipt, ...prev]
+      saveReceipts(next)
+      return next
+    })
+  }, [])
+
+  const clearStoredReceipts = useCallback(() => {
+    clearReceipts()
+    setReceipts([])
   }, [])
 
   const refresh = useCallback(async () => {
-    if (!wallet.publicKey) return
+if (!wallet.publicKey) return
     setWallet(prev => ({ ...prev, refreshing: true }))
     try {
-      await fetchBalances(wallet.publicKey)
-      await fetchTransactions(wallet.publicKey)
+      await fetchWalletData(wallet.publicKey)
     } finally {
       setWallet(prev => ({ ...prev, refreshing: false }))
     }
-  }, [wallet.publicKey, fetchBalances, fetchTransactions])
+  }, [wallet.publicKey, fetchWalletData])
+
+  // Recreate the Horizon client whenever the wallet switches networks.
+  // Also discard all cached balances and stale cross-network data so the
+  // next fetch goes to the correct endpoint.
+  useEffect(() => {
+    horizonRef.current = new Horizon.Server(getHorizonUrl(wallet.network))
+    // Invalidate the entire balance cache — entries from the old network are
+    // wrong on the new one (different accounts, different balances).
+    balanceCache.clear()
+    // Reset account data so stale cross-network balances are not displayed.
+    setWallet(prev => ({
+      ...prev,
+      xlmBalance: '0',
+      usdcBalance: '0',
+      usdcTrustline: null,
+      error: null,
+      fundingRequired: false,
+    }))
+    setTransactions([])
+    setTxCursor(null)
+    setTxHasMore(false)
+    setTransactionError(null)
+  }, [wallet.network])
 
   // Auto-check if already connected on mount
   useEffect(() => {
     const check = async () => {
       try {
         const connected = await isConnected()
-        if (connected.error) {
+if (connected.error) {
           throw new Error(connected.error.message)
+        }
+        if (connected.isConnected) {
+          const addr = await getAddress()
+          if (addr.address) {
+            const net = await getNetwork()
+            setWallet(prev => ({
+              ...prev,
+              publicKey: addr.address,
+              connected: true,
+              network: net.network || 'TESTNET',
+            }))
+            fetchWalletData(addr.address)
+          }
         }
         if (!connected.isConnected) return
 
@@ -361,16 +513,89 @@ export function useFreighterWallet() {
       }
     }
     check()
-  }, [fetchBalances, fetchTransactions])
+  }, [fetchWalletData])
+
+  // Freighter does not emit a reliable account-change event in every browser.
+  // Poll while connected so switching accounts or networks updates all data.
+  useEffect(() => {
+    if (!wallet.connected || !wallet.publicKey) return
+
+    let checking = false
+    const checkAddress = async () => {
+      if (checking) return
+      checking = true
+      try {
+        const [addrResult, netResult] = await Promise.all([getAddress(), getNetwork()])
+
+        const networkChanged =
+          !netResult.error &&
+          netResult.network &&
+          netResult.network !== wallet.network
+
+        const addressChanged =
+          !addrResult.error &&
+          addrResult.address &&
+          addrResult.address !== wallet.publicKey
+
+        if (networkChanged) {
+          // Updating wallet.network triggers the network-change useEffect above
+          // which recreates the Horizon client and clears stale data.
+          setWallet(prev => ({
+            ...prev,
+            network: netResult.network!,
+            // Clear publicKey-derived data — the account may differ per network
+            publicKey: addrResult.address || prev.publicKey,
+            error: null,
+          }))
+          setTransactions([])
+          setTxCursor(null)
+          setTxHasMore(false)
+          toast.info('Freighter network switched', {
+            description: `Now querying ${netResult.network} Horizon. Refreshing balances…`,
+          })
+          // Re-fetch after the state flush; use the address from this poll.
+          const nextAddress = addrResult.address || wallet.publicKey
+          await fetchBalances(nextAddress)
+          await fetchTransactions(nextAddress)
+          return
+        }
+
+        if (addressChanged) {
+          const nextAddress = addrResult.address!
+          setWallet(prev => ({ ...prev, publicKey: nextAddress, error: null }))
+          setTransactions([])
+          setTxCursor(null)
+          setTxHasMore(false)
+          await fetchBalances(nextAddress)
+          await fetchTransactions(nextAddress)
+          toast.success('Freighter account switched', {
+            description: 'Balances and transaction history were refreshed.',
+          })
+        }
+      } catch (err) {
+        console.warn('Could not check the active Freighter account:', err)
+      } finally {
+        checking = false
+      }
+    }
+
+    const interval = window.setInterval(checkAddress, 4000)
+    return () => window.clearInterval(interval)
+  }, [wallet.connected, wallet.publicKey, wallet.network, fetchBalances, fetchTransactions])
 
   return {
     wallet,
     transactions,
     txLoading,
-    transactionError,
+transactionError,
     txLoadingMore,
     txHasMore,
     loadMoreTransactions,
+    receipts,
+    searchSession,
+    setSearchSession,
+    addReceipt,
+    clearStoredReceipts,
     connect,
     disconnect,
     refresh,

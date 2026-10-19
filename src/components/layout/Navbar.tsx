@@ -1,8 +1,8 @@
 import { m } from 'framer-motion'
-import { Search, BookOpen, BarChart2, ExternalLink, Zap, Github, Globe } from 'lucide-react'
+import { Search, BookOpen, BarChart2, ExternalLink, Zap, Github } from 'lucide-react'
 import { WalletPanel } from '../wallet/WalletPanel'
+import { MainnetIndicator, NetworkBadge } from './NetworkBadge'
 import type { WalletState, StellarTransaction } from '../../hooks/useFreighterWallet'
-import { IS_MAINNET } from '../../lib/stellar'
 
 type Page = 'search' | 'docs' | 'dashboard'
 
@@ -15,6 +15,7 @@ const NAV_ITEMS: { id: Page; label: string; Icon: React.FC<{ className?: string 
 interface Props {
   page: Page
   onNavigate: (p: Page) => void
+  onPrefetch?: (p: Page) => void
   wallet: WalletState
   transactions: StellarTransaction[]
   txLoading: boolean
@@ -24,7 +25,7 @@ interface Props {
 }
 
 export function Navbar({
-  page, onNavigate,
+  page, onNavigate, onPrefetch,
   wallet, transactions, txLoading,
   onConnect, onDisconnect, onRefresh,
 }: Props) {
@@ -33,11 +34,16 @@ export function Navbar({
       className="sticky top-0 z-40 border-b border-white/5"
       style={{ background: 'rgba(2,4,8,0.85)', backdropFilter: 'blur(16px)' }}
     >
+      {/* Mainnet-only page-level indicator (renders nothing on testnet) */}
+      <MainnetIndicator />
+
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-5">
 
         {/* Logo */}
         <button
           onClick={() => onNavigate('search')}
+          onMouseEnter={() => onPrefetch?.('search')}
+          onFocus={() => onPrefetch?.('search')}
           className="flex items-center gap-2 flex-shrink-0 group"
         >
           <div
@@ -51,17 +57,8 @@ export function Navbar({
           </span>
         </button>
 
-        {/* Network Badge */}
-        <div 
-          className={`hidden md:flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-display tracking-widest ${
-            IS_MAINNET 
-              ? 'bg-neon-amber/10 border-neon-amber/30 text-neon-amber' 
-              : 'bg-neon-cyan/10 border-neon-cyan/30 text-neon-cyan'
-          }`}
-        >
-          <Globe className="w-2.5 h-2.5" />
-          {IS_MAINNET ? 'MAINNET' : 'TESTNET'}
-        </div>
+        {/* Persistent network badge — always visible on every page/breakpoint */}
+        <NetworkBadge />
 
         {/* Nav links */}
         <nav className="flex items-center gap-1 flex-1" role="navigation" aria-label="Main navigation">
@@ -69,9 +66,11 @@ export function Navbar({
             <button
               key={id}
               onClick={() => onNavigate(id)}
+              onMouseEnter={() => onPrefetch?.(id)}
+              onFocus={() => onPrefetch?.(id)}
               aria-current={page === id ? "page" : undefined}
               className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-display text-xs tracking-wider transition-colors"
-              style={{ color: page === id ? '#00f5ff' : 'rgba(255,255,255,0.3)' }}
+              style={{ color: page === id ? '#00f5ff' : 'rgba(255,255,255,0.6)' }}
             >
               <Icon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{label}</span>
@@ -96,7 +95,7 @@ export function Navbar({
             href="https://github.com/stellar/x402-stellar"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 rounded-lg text-white/25 hover:text-white/55 hover:bg-white/5 transition-all"
+            className="p-2 rounded-lg text-white/60 hover:text-white/80 hover:bg-white/5 transition-all"
           >
             <Github className="w-4 h-4" />
           </a>
@@ -104,7 +103,7 @@ export function Navbar({
             href="https://developers.stellar.org/docs/build/agentic-payments/x402"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-display text-xs text-white/25 hover:text-white/50 transition-all"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-display text-xs text-white/60 hover:text-white/80 transition-all"
             style={{ border: '1px solid rgba(255,255,255,0.08)' }}
           >
             x402 DOCS <ExternalLink className="w-3 h-3" />
